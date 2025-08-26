@@ -1,0 +1,13 @@
+@echo off
+echo Starting BetTracker Frontend...
+
+cd frontend
+
+echo Checking if node_modules exists...
+if not exist "node_modules" (
+    echo Installing dependencies...
+    npm install
+)
+
+echo Starting Vite development server...
+npm run dev
