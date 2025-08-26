@@ -1,11 +1,21 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Button, Box } from '@mui/material';
-import { Dashboard as DashboardIcon, List as ListIcon } from '@mui/icons-material';
+import { Button, Box, IconButton, Tooltip } from '@mui/material';
+import { 
+  Dashboard as DashboardIcon, 
+  List as ListIcon,
+  AccountBalance as AccountBalanceIcon,
+  TrendingUp as TrendingUpIcon,
+  DarkMode as DarkModeIcon,
+  LightMode as LightModeIcon
+} from '@mui/icons-material';
+import { useTheme } from '../contexts/ThemeContext.jsx';
 
 const Navigation = () => {
+  const { isDarkMode, toggleDarkMode } = useTheme();
+
   return (
-    <Box sx={{ display: 'flex', gap: 1 }}>
+    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
       <Button
         component={NavLink}
         to="/"
@@ -32,6 +42,41 @@ const Navigation = () => {
       >
         My Bets
       </Button>
+      <Button
+        component={NavLink}
+        to="/transactions"
+        color="inherit"
+        startIcon={<AccountBalanceIcon />}
+        sx={{
+          '&.active': {
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          },
+        }}
+      >
+        Transactions
+      </Button>
+      <Button
+        component={NavLink}
+        to="/arbitrages"
+        color="inherit"
+        startIcon={<TrendingUpIcon />}
+        sx={{
+          '&.active': {
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          },
+        }}
+      >
+        Arbitrages
+      </Button>
+      <Tooltip title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+        <IconButton
+          color="inherit"
+          onClick={toggleDarkMode}
+          sx={{ ml: 1 }}
+        >
+          {isDarkMode ? <LightModeIcon /> : <DarkModeIcon />}
+        </IconButton>
+      </Tooltip>
     </Box>
   );
 };

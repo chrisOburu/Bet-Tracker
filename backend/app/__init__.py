@@ -19,10 +19,16 @@ def create_app():
     
     # Import models
     from app.models.bet import Bet
+    from app.models.transaction import Transaction
+    from app.models.arbitrage import Arbitrage
     
     # Register blueprints
     from app.routes.bets import bets_bp
+    from app.routes.transactions import transactions_bp
+    from app.routes.arbitrages import arbitrages_bp
     app.register_blueprint(bets_bp, url_prefix='/api')
+    app.register_blueprint(transactions_bp, url_prefix='/api')
+    app.register_blueprint(arbitrages_bp, url_prefix='/api')
     
     # Create tables
     with app.app_context():

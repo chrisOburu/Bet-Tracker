@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from app import db
 from app.models.bet import Bet
 from datetime import datetime
-from sqlalchemy import desc
+from sqlalchemy import desc, case
 
 bets_bp = Blueprint('bets', __name__)
 
@@ -19,7 +19,15 @@ def get_bets():
     if sport:
         query = query.filter(Bet.sport == sport)
     
-    bets = query.order_by(desc(Bet.date_placed)).all()
+    # Order by: pending bets first (status='pending' gets priority 0, others get priority 1)
+    # Then by date_placed descending (newest first)
+    bets = query.order_by(
+        case(
+            (Bet.status == 'pending', 0),
+            else_=1
+        ),
+        desc(Bet.date_placed)
+    ).all()
     return jsonify([bet.to_dict() for bet in bets])
 
 @bets_bp.route('/bets', methods=['POST'])
@@ -31,14 +39,24 @@ def create_bet():
         # Calculate potential payout
         potential_payout = data['stake'] * data['odds']
         
+        # Parse kickoff datetime if provided
+        kickoff = None
+        if 'kickoff' in data and data['kickoff']:
+            try:
+                kickoff = datetime.fromisoformat(data['kickoff'].replace('Z', '+00:00'))
+            except ValueError:
+                return jsonify({'error': 'Invalid kickoff datetime format'}), 400
+        
         bet = Bet(
             sport=data['sport'],
             event_name=data['event_name'],
             bet_type=data['bet_type'],
             selection=data['selection'],
+            sportsbook=data['sportsbook'],
             odds=data['odds'],
             stake=data['stake'],
             potential_payout=potential_payout,
+            kickoff=kickoff,
             notes=data.get('notes', '')
         )
         
@@ -57,9 +75,19 @@ def update_bet(bet_id):
     
     try:
         # Update fields
-        for field in ['sport', 'event_name', 'bet_type', 'selection', 'odds', 'stake', 'notes']:
+        for field in ['sport', 'event_name', 'bet_type', 'selection', 'sportsbook', 'odds', 'stake', 'notes']:
             if field in data:
                 setattr(bet, field, data[field])
+        
+        # Handle kickoff datetime update
+        if 'kickoff' in data:
+            if data['kickoff']:
+                try:
+                    bet.kickoff = datetime.fromisoformat(data['kickoff'].replace('Z', '+00:00'))
+                except ValueError:
+                    return jsonify({'error': 'Invalid kickoff datetime format'}), 400
+            else:
+                bet.kickoff = None
         
         # Handle status change
         if 'status' in data:

@@ -120,6 +120,23 @@ const BetList = () => {
     }).format(amount);
   };
 
+  const formatDateTime = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return {
+      date: date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      }),
+      time: date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
+    };
+  };
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString();
   };
@@ -196,10 +213,12 @@ const BetList = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Date</TableCell>
+              <TableCell>Date & Time</TableCell>
               <TableCell>Sport</TableCell>
               <TableCell>Event</TableCell>
               <TableCell>Selection</TableCell>
+              <TableCell>Sportsbook</TableCell>
+              <TableCell>Kickoff</TableCell>
               <TableCell align="right">Odds</TableCell>
               <TableCell align="right">Stake</TableCell>
               <TableCell align="right">Potential</TableCell>
@@ -211,20 +230,34 @@ const BetList = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={10} align="center">
+                <TableCell colSpan={12} align="center">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : bets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} align="center">
+                <TableCell colSpan={12} align="center">
                   No bets found
                 </TableCell>
               </TableRow>
             ) : (
               bets.map((bet) => (
                 <TableRow key={bet.id} hover>
-                  <TableCell>{formatDate(bet.date_placed)}</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const dateTime = formatDateTime(bet.date_placed);
+                      return (
+                        <Box>
+                          <Typography variant="body2" fontWeight="medium">
+                            {dateTime.date}
+                          </Typography>
+                          <Typography variant="caption" color="textSecondary">
+                            {dateTime.time}
+                          </Typography>
+                        </Box>
+                      );
+                    })()}
+                  </TableCell>
                   <TableCell>
                     <Chip label={bet.sport} size="small" variant="outlined" />
                   </TableCell>
@@ -237,6 +270,30 @@ const BetList = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>{bet.selection}</TableCell>
+                  <TableCell>
+                    <Chip label={bet.sportsbook} size="small" variant="outlined" color="primary" />
+                  </TableCell>
+                  <TableCell>
+                    {bet.kickoff ? (
+                      (() => {
+                        const kickoffDateTime = formatDateTime(bet.kickoff);
+                        return (
+                          <Box>
+                            <Typography variant="body2" fontWeight="medium">
+                              {kickoffDateTime.date}
+                            </Typography>
+                            <Typography variant="caption" color="textSecondary">
+                              {kickoffDateTime.time}
+                            </Typography>
+                          </Box>
+                        );
+                      })()
+                    ) : (
+                      <Typography variant="caption" color="textSecondary">
+                        TBD
+                      </Typography>
+                    )}
+                  </TableCell>
                   <TableCell align="right">{bet.odds}</TableCell>
                   <TableCell align="right">{formatCurrency(bet.stake)}</TableCell>
                   <TableCell align="right">{formatCurrency(bet.potential_payout)}</TableCell>

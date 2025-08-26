@@ -7,14 +7,16 @@ class Bet(db.Model):
     event_name = db.Column(db.String(200), nullable=False)
     bet_type = db.Column(db.String(100), nullable=False)  # e.g., 'Moneyline', 'Spread', 'Over/Under'
     selection = db.Column(db.String(200), nullable=False)  # What you bet on
+    sportsbook = db.Column(db.String(100), nullable=False)  # Which sportsbook the bet was placed with
     odds = db.Column(db.Float, nullable=False)  # Decimal odds
     stake = db.Column(db.Float, nullable=False)  # Amount wagered
     status = db.Column(db.String(20), nullable=False, default='pending')  # 'pending', 'won', 'lost', 'void'
     potential_payout = db.Column(db.Float, nullable=False)  # stake * odds
     actual_payout = db.Column(db.Float, default=0.0)  # Actual amount received if won
     profit_loss = db.Column(db.Float, default=0.0)  # Profit or loss
-    date_placed = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    date_placed = db.Column(db.DateTime, nullable=False, default=datetime.now)
     date_settled = db.Column(db.DateTime)
+    kickoff = db.Column(db.DateTime)  # Event start time
     notes = db.Column(db.Text)
     
     def __repr__(self):
@@ -27,6 +29,7 @@ class Bet(db.Model):
             'event_name': self.event_name,
             'bet_type': self.bet_type,
             'selection': self.selection,
+            'sportsbook': self.sportsbook,
             'odds': self.odds,
             'stake': self.stake,
             'status': self.status,
@@ -35,5 +38,6 @@ class Bet(db.Model):
             'profit_loss': self.profit_loss,
             'date_placed': self.date_placed.isoformat() if self.date_placed else None,
             'date_settled': self.date_settled.isoformat() if self.date_settled else None,
+            'kickoff': self.kickoff.isoformat() if self.kickoff else None,
             'notes': self.notes
         }

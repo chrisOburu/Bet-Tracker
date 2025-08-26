@@ -9,6 +9,7 @@ import {
   MenuItem,
   Box,
   Grid,
+  Typography,
 } from '@mui/material';
 import { betService } from '../services/api.js';
 
@@ -18,8 +19,10 @@ const BetForm = ({ open, onClose, onSubmit, bet = null }) => {
     event_name: '',
     bet_type: '',
     selection: '',
+    sportsbook: '',
     odds: '',
     stake: '',
+    kickoff: '',
     notes: '',
   });
 
@@ -32,8 +35,10 @@ const BetForm = ({ open, onClose, onSubmit, bet = null }) => {
         event_name: bet.event_name || '',
         bet_type: bet.bet_type || '',
         selection: bet.selection || '',
+        sportsbook: bet.sportsbook || '',
         odds: bet.odds || '',
         stake: bet.stake || '',
+        kickoff: bet.kickoff ? bet.kickoff.slice(0, 16) : '', // Format for datetime-local input
         notes: bet.notes || '',
       });
     } else {
@@ -42,8 +47,10 @@ const BetForm = ({ open, onClose, onSubmit, bet = null }) => {
         event_name: '',
         bet_type: '',
         selection: '',
+        sportsbook: '',
         odds: '',
         stake: '',
+        kickoff: '',
         notes: '',
       });
     }
@@ -73,6 +80,7 @@ const BetForm = ({ open, onClose, onSubmit, bet = null }) => {
     if (!formData.event_name) newErrors.event_name = 'Event name is required';
     if (!formData.bet_type) newErrors.bet_type = 'Bet type is required';
     if (!formData.selection) newErrors.selection = 'Selection is required';
+    if (!formData.sportsbook) newErrors.sportsbook = 'Sportsbook is required';
     if (!formData.odds || isNaN(formData.odds) || parseFloat(formData.odds) <= 0) {
       newErrors.odds = 'Valid odds are required';
     }
@@ -114,6 +122,12 @@ const BetForm = ({ open, onClose, onSubmit, bet = null }) => {
   const sports = [
     'Football', 'Basketball', 'Baseball', 'Hockey', 'Soccer', 
     'Tennis', 'Golf', 'Boxing', 'MMA', 'Other'
+  ];
+
+  const sportsbooks = [
+    'DraftKings', 'FanDuel', 'BetMGM', 'Caesars', 'PointsBet', 
+    'BetRivers', 'Unibet', 'WynnBET', 'Barstool', 'FOX Bet',
+    'ESPN BET', 'bet365', 'Hard Rock Bet', 'Fanatics', 'Other'
   ];
 
   const betTypes = [
@@ -191,6 +205,24 @@ const BetForm = ({ open, onClose, onSubmit, bet = null }) => {
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
+                select
+                name="sportsbook"
+                label="Sportsbook"
+                value={formData.sportsbook}
+                onChange={handleChange}
+                fullWidth
+                error={!!errors.sportsbook}
+                helperText={errors.sportsbook}
+              >
+                {sportsbooks.map((book) => (
+                  <MenuItem key={book} value={book}>
+                    {book}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
                 name="odds"
                 label="Odds (Decimal)"
                 value={formData.odds}
@@ -217,6 +249,21 @@ const BetForm = ({ open, onClose, onSubmit, bet = null }) => {
                 placeholder="e.g., 100"
               />
             </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                name="kickoff"
+                label="Kickoff Time"
+                value={formData.kickoff}
+                onChange={handleChange}
+                fullWidth
+                type="datetime-local"
+                error={!!errors.kickoff}
+                helperText={errors.kickoff || "When the event starts"}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+              />
+            </Grid>
             <Grid item xs={12}>
               <TextField
                 name="notes"
@@ -231,8 +278,32 @@ const BetForm = ({ open, onClose, onSubmit, bet = null }) => {
             </Grid>
             {formData.odds && formData.stake && (
               <Grid item xs={12}>
-                <Box sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-                  <strong>Potential Payout: ${(parseFloat(formData.odds || 0) * parseFloat(formData.stake || 0)).toFixed(2)}</strong>
+                <Box sx={{ 
+                  p: 2, 
+                  bgcolor: 'background.paper', 
+                  borderRadius: 1,
+                  border: 1,
+                  borderColor: 'divider'
+                }}>
+                  <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                    Bet Summary
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Potential Payout:</strong> ${(parseFloat(formData.odds || 0) * parseFloat(formData.stake || 0)).toFixed(2)}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Potential Profit:</strong> ${((parseFloat(formData.odds || 0) * parseFloat(formData.stake || 0)) - parseFloat(formData.stake || 0)).toFixed(2)}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    <strong>Date:</strong> {new Date().toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false
+                    })}
+                  </Typography>
                 </Box>
               </Grid>
             )}

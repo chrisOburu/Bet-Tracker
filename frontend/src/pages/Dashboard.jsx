@@ -56,6 +56,18 @@ const Dashboard = () => {
     }
   };
 
+  const formatDateTime = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -80,38 +92,41 @@ const Dashboard = () => {
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <Card className="bg-blue-50">
+          <Card sx={{ bgcolor: 'primary.light', color: 'primary.contrastText' }}>
             <CardContent>
               <Box display="flex" alignItems="center" justifyContent="space-between">
                 <Box>
-                  <Typography color="textSecondary" gutterBottom variant="body2">
+                  <Typography color="inherit" gutterBottom variant="body2" sx={{ opacity: 0.8 }}>
                     Total Bets
                   </Typography>
-                  <Typography variant="h4">
+                  <Typography variant="h4" color="inherit">
                     {stats?.total_bets || 0}
                   </Typography>
                 </Box>
-                <Sports color="primary" sx={{ fontSize: 40 }} />
+                <Sports sx={{ fontSize: 40, opacity: 0.8 }} />
               </Box>
             </CardContent>
           </Card>
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card className={`${stats?.total_profit_loss >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+          <Card sx={{ 
+            bgcolor: stats?.total_profit_loss >= 0 ? 'success.light' : 'error.light',
+            color: stats?.total_profit_loss >= 0 ? 'success.contrastText' : 'error.contrastText'
+          }}>
             <CardContent>
               <Box display="flex" alignItems="center" justifyContent="space-between">
                 <Box>
-                  <Typography color="textSecondary" gutterBottom variant="body2">
+                  <Typography color="inherit" gutterBottom variant="body2" sx={{ opacity: 0.8 }}>
                     Total P&L
                   </Typography>
-                  <Typography variant="h4" color={stats?.total_profit_loss >= 0 ? 'success.main' : 'error.main'}>
+                  <Typography variant="h4" color="inherit">
                     {formatCurrency(stats?.total_profit_loss || 0)}
                   </Typography>
                 </Box>
                 {stats?.total_profit_loss >= 0 ? 
-                  <TrendingUp color="success" sx={{ fontSize: 40 }} /> :
-                  <TrendingDown color="error" sx={{ fontSize: 40 }} />
+                  <TrendingUp sx={{ fontSize: 40, opacity: 0.8 }} /> :
+                  <TrendingDown sx={{ fontSize: 40, opacity: 0.8 }} />
                 }
               </Box>
             </CardContent>
@@ -119,36 +134,36 @@ const Dashboard = () => {
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card className="bg-purple-50">
+          <Card sx={{ bgcolor: 'secondary.light', color: 'secondary.contrastText' }}>
             <CardContent>
               <Box display="flex" alignItems="center" justifyContent="space-between">
                 <Box>
-                  <Typography color="textSecondary" gutterBottom variant="body2">
+                  <Typography color="inherit" gutterBottom variant="body2" sx={{ opacity: 0.8 }}>
                     Win Rate
                   </Typography>
-                  <Typography variant="h4">
+                  <Typography variant="h4" color="inherit">
                     {stats?.win_rate?.toFixed(1) || 0}%
                   </Typography>
                 </Box>
-                <AccountBalance color="secondary" sx={{ fontSize: 40 }} />
+                <AccountBalance sx={{ fontSize: 40, opacity: 0.8 }} />
               </Box>
             </CardContent>
           </Card>
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card className="bg-orange-50">
+          <Card sx={{ bgcolor: 'warning.light', color: 'warning.contrastText' }}>
             <CardContent>
               <Box display="flex" alignItems="center" justifyContent="space-between">
                 <Box>
-                  <Typography color="textSecondary" gutterBottom variant="body2">
+                  <Typography color="inherit" gutterBottom variant="body2" sx={{ opacity: 0.8 }}>
                     ROI
                   </Typography>
-                  <Typography variant="h4" color={stats?.roi >= 0 ? 'success.main' : 'error.main'}>
+                  <Typography variant="h4" color="inherit">
                     {stats?.roi?.toFixed(1) || 0}%
                   </Typography>
                 </Box>
-                <TrendingUp color={stats?.roi >= 0 ? 'success' : 'error'} sx={{ fontSize: 40 }} />
+                <TrendingUp sx={{ fontSize: 40, opacity: 0.8 }} />
               </Box>
             </CardContent>
           </Card>

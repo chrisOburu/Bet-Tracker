@@ -1,26 +1,17 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AppBar, Toolbar, Typography, Container } from '@mui/material';
 import Dashboard from './pages/Dashboard.jsx';
 import BetList from './pages/BetList.jsx';
+import Transactions from './pages/Transactions.jsx';
+import Arbitrages from './pages/Arbitrages.jsx';
 import Navigation from './components/Navigation.jsx';
-
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-  },
-});
+import ThemeContextProvider from './contexts/ThemeContext.jsx';
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeContextProvider>
       <CssBaseline />
       <Router>
         <AppBar position="static" className="mb-4">
@@ -35,10 +26,12 @@ function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/bets" element={<BetList />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/arbitrages" element={<Arbitrages />} />
           </Routes>
         </Container>
       </Router>
-    </ThemeProvider>
+    </ThemeContextProvider>
   );
 }
 

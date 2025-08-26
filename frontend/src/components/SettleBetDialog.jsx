@@ -19,6 +19,18 @@ const SettleBetDialog = ({ open, onClose, bet, onSettled }) => {
   const [status, setStatus] = useState('');
   const [actualPayout, setActualPayout] = useState('');
 
+  const formatDateTime = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  };
+
   const handleSettle = async () => {
     try {
       const updateData = { status };
@@ -54,8 +66,16 @@ const SettleBetDialog = ({ open, onClose, bet, onSettled }) => {
         <Box sx={{ mb: 2 }}>
           <Typography variant="subtitle1"><strong>Event:</strong> {bet.event_name}</Typography>
           <Typography variant="subtitle1"><strong>Selection:</strong> {bet.selection}</Typography>
+          <Typography variant="subtitle1"><strong>Sportsbook:</strong> {bet.sportsbook}</Typography>
+          {bet.kickoff && (
+            <Typography variant="subtitle1"><strong>Kickoff:</strong> {formatDateTime(bet.kickoff)}</Typography>
+          )}
           <Typography variant="subtitle1"><strong>Stake:</strong> ${bet.stake}</Typography>
           <Typography variant="subtitle1"><strong>Potential Payout:</strong> ${bet.potential_payout}</Typography>
+          <Typography variant="subtitle1"><strong>Date Placed:</strong> {formatDateTime(bet.date_placed)}</Typography>
+          {bet.date_settled && (
+            <Typography variant="subtitle1"><strong>Date Settled:</strong> {formatDateTime(bet.date_settled)}</Typography>
+          )}
         </Box>
 
         <FormControl fullWidth sx={{ mb: 2 }}>
