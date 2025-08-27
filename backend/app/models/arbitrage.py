@@ -6,17 +6,12 @@ class Arbitrage(db.Model):
     __tablename__ = 'arbitrage'
     
     id = db.Column(db.Integer, primary_key=True)
-    profit = db.Column(db.Float, nullable=False)  # Profit percentage
-    market_name = db.Column(db.String(200), nullable=False)
-    home_team = db.Column(db.String(200), nullable=False)
-    away_team = db.Column(db.String(200), nullable=False)
-    league = db.Column(db.String(200), nullable=True)
-    country = db.Column(db.String(100), nullable=True)
-    match_signature = db.Column(db.String(500), nullable=False)
-    kickoff_datetime = db.Column(db.DateTime, nullable=False)
-    combination_details = db.Column(db.Text, nullable=False)  # JSON string of betting opportunities
-    date_created = db.Column(db.DateTime, default=datetime.now)
-    is_active = db.Column(db.Boolean, default=True)  # Whether the arbitrage is still available
+    match_signature = db.Column(db.String(255), nullable=False, index=True)
+    profit = db.Column(db.Float, nullable=False, index=True)
+    kickoff_datetime = db.Column(db.String(50), nullable=False, index=True)
+    combination_details = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
     def to_dict(self):
         try:
@@ -26,18 +21,13 @@ class Arbitrage(db.Model):
             
         return {
             'id': self.id,
-            'profit': self.profit,
-            'market_name': self.market_name,
-            'home_team': self.home_team,
-            'away_team': self.away_team,
-            'league': self.league,
-            'country': self.country,
             'match_signature': self.match_signature,
-            'kickoff_datetime': self.kickoff_datetime.isoformat() if self.kickoff_datetime else None,
+            'profit': self.profit,
+            'kickoff_datetime': self.kickoff_datetime,
             'combination_details': combination_data,
-            'date_created': self.date_created.isoformat() if self.date_created else None,
-            'is_active': self.is_active
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
     
     def __repr__(self):
-        return f'<Arbitrage {self.home_team} vs {self.away_team} - {self.profit}% profit>'
+        return f'<Arbitrage {self.match_signature} - {self.profit}% profit>'

@@ -22,6 +22,8 @@ import {
   Card,
   CardContent,
   Alert,
+  Pagination,
+  Stack,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -32,6 +34,7 @@ import {
 } from '@mui/icons-material';
 import { transactionService } from '../services/transactionApi.js';
 import TransactionForm from '../components/TransactionForm.jsx';
+import { getBookmakerLink } from '../utils/bookmakerMapper.js';
 
 const Transactions = () => {
   const [transactions, setTransactions] = useState([]);
@@ -42,6 +45,14 @@ const Transactions = () => {
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    per_page: 50,
+    total: 0,
+    pages: 0,
+    has_next: false,
+    has_prev: false
+  });
   
   // Filters
   const [filters, setFilters] = useState({
@@ -61,11 +72,28 @@ const Transactions = () => {
   const fetchTransactions = async () => {
     try {
       setLoading(true);
+      const queryParams = {
+        ...filters,
+        page: pagination.page,
+        per_page: pagination.per_page
+      };
       const [transactionsData, statsData] = await Promise.all([
-        transactionService.getTransactions(filters),
+        transactionService.getTransactions(queryParams),
         transactionService.getTransactionStats(filters)
       ]);
-      setTransactions(transactionsData);
+      
+      // Handle the new paginated response format
+      if (transactionsData.transactions) {
+        setTransactions(transactionsData.transactions);
+        setPagination(prev => ({
+          ...prev,
+          ...transactionsData.pagination
+        }));
+      } else {
+        // Fallback for old format
+        setTransactions(Array.isArray(transactionsData) ? transactionsData : []);
+      }
+      
       setStats(statsData);
       setError('');
     } catch (err) {
@@ -78,7 +106,14 @@ const Transactions = () => {
 
   useEffect(() => {
     fetchTransactions();
-  }, [filters]);
+  }, [filters, pagination.page]);
+
+  const handlePageChange = (event, newPage) => {
+    setPagination(prev => ({
+      ...prev,
+      page: newPage
+    }));
+  };
 
   const formatDateTime = (dateString) => {
     if (!dateString) return 'N/A';
@@ -130,6 +165,7 @@ const Transactions = () => {
       ...prev,
       [field]: event.target.value
     }));
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
   const clearFilters = () => {
@@ -140,6 +176,7 @@ const Transactions = () => {
       start_date: '',
       end_date: ''
     });
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
   const getStatusColor = (status) => {
@@ -243,7 +280,26 @@ const Transactions = () => {
                   ${stats.net_position.toLocaleString()}
                 </Typography>
                 <Typography variant="body2" color="textSecondary">
-                  {stats.total_transactions} total transactions
+                  Withdrawals - Deposits - Fees
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <TrendingDownIcon color="warning" sx={{ mr: 1 }} />
+                  <Typography color="textSecondary" gutterBottom>
+                    Total Fees & Tax
+                  </Typography>
+                </Box>
+                <Typography variant="h5" component="div" color="warning.main">
+                  ${((stats.total_tax || 0) + (stats.total_charges || 0)).toLocaleString()}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Tax: ${(stats.total_tax || 0).toLocaleString()} | Charges: ${(stats.total_charges || 0).toLocaleString()}
                 </Typography>
               </CardContent>
             </Card>
@@ -346,6 +402,8 @@ const Transactions = () => {
               <TableCell>Type</TableCell>
               <TableCell>Sportsbook</TableCell>
               <TableCell align="right">Amount</TableCell>
+              <TableCell align="right">Tax</TableCell>
+              <TableCell align="right">Transaction Charges</TableCell>
               <TableCell>Payment Method</TableCell>
               <TableCell>Status</TableCell>
               <TableCell>Reference ID</TableCell>
@@ -355,7 +413,7 @@ const Transactions = () => {
           <TableBody>
             {transactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center">
+                <TableCell colSpan={10} align="center">
                   <Typography variant="body2" color="textSecondary">
                     No transactions found
                   </Typography>
@@ -372,7 +430,26 @@ const Transactions = () => {
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>{transaction.sportsbook}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={transaction.sportsbook}
+                      size="small"
+                      variant="outlined"
+                      color="primary"
+                      onClick={() => {
+                        const url = getBookmakerLink(transaction.sportsbook);
+                        if (url && url !== '#') {
+                          window.open(url, '_blank', 'noopener,noreferrer');
+                        }
+                      }}
+                      sx={{ 
+                        cursor: getBookmakerLink(transaction.sportsbook) !== '#' ? 'pointer' : 'default',
+                        '&:hover': {
+                          backgroundColor: getBookmakerLink(transaction.sportsbook) !== '#' ? 'primary.light' : 'inherit',
+                        }
+                      }}
+                    />
+                  </TableCell>
                   <TableCell align="right">
                     <Typography 
                       color={transaction.transaction_type === 'deposit' ? 'success.main' : 'error.main'}
@@ -381,6 +458,8 @@ const Transactions = () => {
                       {transaction.transaction_type === 'deposit' ? '+' : '-'}${transaction.amount.toLocaleString()}
                     </Typography>
                   </TableCell>
+                  <TableCell align="right">${(transaction.tax || 0).toFixed(2)}</TableCell>
+                  <TableCell align="right">${(transaction.transaction_charges || 0).toFixed(2)}</TableCell>
                   <TableCell>{transaction.payment_method || 'N/A'}</TableCell>
                   <TableCell>
                     <Chip 
@@ -401,6 +480,26 @@ const Transactions = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Pagination and Summary */}
+      {!loading && transactions.length > 0 && (
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="body2" color="text.secondary">
+            Showing {((pagination.page - 1) * pagination.per_page) + 1} to {Math.min(pagination.page * pagination.per_page, pagination.total)} of {pagination.total} transactions
+          </Typography>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Pagination
+              count={pagination.pages}
+              page={pagination.page}
+              onChange={handlePageChange}
+              color="primary"
+              size="medium"
+              showFirstButton
+              showLastButton
+            />
+          </Stack>
+        </Box>
+      )}
 
       {/* Context Menu */}
       <Menu

@@ -20,6 +20,19 @@ const Navigation = () => {
         component={NavLink}
         to="/"
         color="inherit"
+        startIcon={<TrendingUpIcon />}
+        sx={{
+          '&.active': {
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          },
+        }}
+      >
+        Arbitrages
+      </Button>
+      <Button
+        component={NavLink}
+        to="/dashboard"
+        color="inherit"
         startIcon={<DashboardIcon />}
         sx={{
           '&.active': {
@@ -54,19 +67,6 @@ const Navigation = () => {
         }}
       >
         Transactions
-      </Button>
-      <Button
-        component={NavLink}
-        to="/arbitrages"
-        color="inherit"
-        startIcon={<TrendingUpIcon />}
-        sx={{
-          '&.active': {
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-          },
-        }}
-      >
-        Arbitrages
       </Button>
       <Tooltip title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
         <IconButton

@@ -7,7 +7,7 @@ transactions_bp = Blueprint('transactions', __name__)
 
 @transactions_bp.route('/transactions', methods=['GET'])
 def get_transactions():
-    """Get all transactions with optional filtering"""
+    """Get all transactions with optional filtering and pagination"""
     try:
         # Get query parameters
         transaction_type = request.args.get('type')  # 'deposit' or 'withdrawal'
@@ -15,6 +15,11 @@ def get_transactions():
         status = request.args.get('status')
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        
+        # Limit per_page to prevent abuse
+        per_page = min(per_page, 100)
         
         # Build query
         query = Transaction.query
@@ -37,9 +42,26 @@ def get_transactions():
             query = query.filter(Transaction.date_created <= end)
         
         # Order by date_created descending
-        transactions = query.order_by(Transaction.date_created.desc()).all()
+        query = query.order_by(Transaction.date_created.desc())
         
-        return jsonify([transaction.to_dict() for transaction in transactions])
+        # Apply pagination
+        paginated = query.paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
+        return jsonify({
+            'transactions': [transaction.to_dict() for transaction in paginated.items],
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': paginated.total,
+                'pages': paginated.pages,
+                'has_next': paginated.has_next,
+                'has_prev': paginated.has_prev
+            }
+        })
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -68,11 +90,17 @@ def create_transaction():
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid amount format'}), 400
         
+        # Get tax and transaction charges from user input (no automatic calculation)
+        tax = data.get('tax', 0.0)  # Default to 0 if not provided
+        transaction_charges = data.get('transaction_charges', 0.0)  # Default to 0 if not provided
+        
         # Create new transaction
         transaction = Transaction(
             transaction_type=data['transaction_type'],
             sportsbook=data['sportsbook'],
             amount=amount,
+            tax=tax,
+            transaction_charges=transaction_charges,
             payment_method=data.get('payment_method'),
             reference_id=data.get('reference_id'),
             status=data.get('status', 'completed'),
@@ -113,6 +141,18 @@ def update_transaction(transaction_id):
                 transaction.amount = amount
             except (ValueError, TypeError):
                 return jsonify({'error': 'Invalid amount format'}), 400
+        
+        if 'tax' in data:
+            try:
+                transaction.tax = float(data['tax']) if data['tax'] else 0.0
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Invalid tax format'}), 400
+        
+        if 'transaction_charges' in data:
+            try:
+                transaction.transaction_charges = float(data['transaction_charges']) if data['transaction_charges'] else 0.0
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Invalid transaction_charges format'}), 400
         
         if 'payment_method' in data:
             transaction.payment_method = data['payment_method']
@@ -178,7 +218,13 @@ def get_transaction_stats():
         # Calculate statistics
         total_deposits = sum(t.amount for t in transactions if t.transaction_type == 'deposit')
         total_withdrawals = sum(t.amount for t in transactions if t.transaction_type == 'withdrawal')
-        net_position = total_deposits - total_withdrawals
+        
+        # Calculate total tax and charges
+        total_tax = sum(t.tax or 0 for t in transactions)
+        total_charges = sum(t.transaction_charges or 0 for t in transactions)
+        
+        # Net position: withdrawals - deposits - tax - charges (money out perspective)
+        net_position = total_withdrawals - total_deposits - total_tax - total_charges
         
         deposit_count = len([t for t in transactions if t.transaction_type == 'deposit'])
         withdrawal_count = len([t for t in transactions if t.transaction_type == 'withdrawal'])
@@ -209,6 +255,8 @@ def get_transaction_stats():
             'total_deposits': round(total_deposits, 2),
             'total_withdrawals': round(total_withdrawals, 2),
             'net_position': round(net_position, 2),
+            'total_tax': round(total_tax, 2),
+            'total_charges': round(total_charges, 2),
             'deposit_count': deposit_count,
             'withdrawal_count': withdrawal_count,
             'total_transactions': len(transactions),

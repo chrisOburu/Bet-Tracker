@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Box, 
   Typography, 
@@ -19,16 +19,42 @@ import ArbitrageTable from '../components/ArbitrageTable';
 import { useArbitrageData } from '../hooks/useArbitrageData';
 
 const Arbitrages = () => {
-  const { data, loading, error, lastFetch, pagination, stats, refetch, reloadData } = useArbitrageData();
+  const { 
+    data, 
+    loading, 
+    error, 
+    lastFetch, 
+    pagination, 
+    stats, 
+    refetch, 
+    reloadData,
+    fetchMatchArbitrages,
+    getMatchArbitrages,
+    isMatchLoading,
+    updateMatchesPerPage
+  } = useArbitrageData();
+
+  const [expandedMatch, setExpandedMatch] = useState(null);
 
   const handlePageChange = (page) => {
     console.log('Page change requested:', page);
+    setExpandedMatch(null); // Close expanded view when changing pages
     refetch(page, pagination.itemsPerPage);
   };
 
   const handleLimitChange = (page, limit) => {
     console.log('Limit change requested:', page, limit);
+    setExpandedMatch(null); // Close expanded view when changing limits
+    updateMatchesPerPage(limit); // Store the new limit in localStorage
     refetch(page, limit);
+  };
+
+  const handleMatchExpand = (matchSignature) => {
+    setExpandedMatch(matchSignature);
+  };
+
+  const handleBackToList = () => {
+    setExpandedMatch(null);
   };
 
   const formatLastFetch = () => {
@@ -148,6 +174,12 @@ const Arbitrages = () => {
         pagination={pagination}
         onPageChange={handlePageChange}
         onLimitChange={handleLimitChange}
+        fetchMatchArbitrages={fetchMatchArbitrages}
+        getMatchArbitrages={getMatchArbitrages}
+        isMatchLoading={isMatchLoading}
+        expandedMatch={expandedMatch}
+        onMatchExpand={handleMatchExpand}
+        onBackToList={handleBackToList}
       />
     </Box>
   );

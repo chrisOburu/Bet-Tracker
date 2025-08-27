@@ -5,6 +5,7 @@ Script to import arbitrage opportunities from JSON file into the database
 import sys
 import os
 import json
+import requests
 
 # Add the current directory to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -41,17 +42,18 @@ def import_arbitrage_data():
         
         for item in arbitrage_data:
             try:
+                # Ensure combination_details is properly formatted
+                combination_details = item.get('combination_details', [])
+                if isinstance(combination_details, list):
+                    combination_details = json.dumps(combination_details)
+                elif not isinstance(combination_details, str):
+                    combination_details = json.dumps([])
+                
                 arbitrage = Arbitrage(
                     profit=item['profit'],
-                    market_name=item['market_name'],
-                    home_team=item['home_team'],
-                    away_team=item['away_team'],
-                    league=item['league'],
-                    country=item.get('country', ''),
                     match_signature=item['match_signature'],
-                    kickoff_datetime=item.get('kickoff_datetime'),
-                    combination_details=item['combination_details'],
-                    is_active=True
+                    kickoff_datetime=item['kickoff_datetime'],
+                    combination_details=combination_details
                 )
                 
                 db.session.add(arbitrage)

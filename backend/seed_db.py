@@ -464,6 +464,6 @@ if __name__ == '__main__':
         # Create dummy data
         create_dummy_bets()
         create_dummy_transactions()
-        create_dummy_arbitrages()
+        #create_dummy_arbitrages()
         
         print("\nAll dummy data created successfully!")

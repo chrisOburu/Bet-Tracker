@@ -24,10 +24,10 @@ function App() {
         </AppBar>
         <Container maxWidth="xl" className="py-4">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<Arbitrages />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/bets" element={<BetList />} />
             <Route path="/transactions" element={<Transactions />} />
-            <Route path="/arbitrages" element={<Arbitrages />} />
           </Routes>
         </Container>
       </Router>

@@ -11,27 +11,45 @@ import {
   AccordionDetails,
   Table,
   TableBody,
-  useTheme
+  CircularProgress,
+  useTheme,
+  Alert,
+  Snackbar
 } from '@mui/material';
 import { Calculate, ExpandMore } from '@mui/icons-material';
 import { formatPercentage, formatTime, formatDate, replaceMarketNames, replaceMarketOutcomeNames } from '../utils/formatters';
 import { getBookmakerLink, getBookmakerDisplayName } from '../utils/bookmakerMapper';
 import { getEventLinkWithMatchId, hasEventLink } from '../utils/eventMapper';
+import { arbitrageService } from '../services/arbitrageApi';
 import StakeCalculator from './StakeCalculator';
+import AddToBetsModal from './AddToBetsModal';
 
-const ArbitrageRow = ({ opportunities, groupIndex, expandedAccordion, onAccordionChange }) => {
+const ArbitrageRow = ({ 
+  opportunity, 
+  groupIndex, 
+  expandedAccordion, 
+  onAccordionChange, 
+  onMatchExpand, // New prop for table replacement
+  fetchMatchArbitrages,
+  getMatchArbitrages,
+  isMatchLoading,
+  isExpandedView = false // Flag to indicate if we're in expanded view
+}) => {
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [calculatorOpportunity, setCalculatorOpportunity] = useState(null);
+  const [addingToBets, setAddingToBets] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
   const theme = useTheme();
   
-  // Always show the first (best) opportunity
-  const bestOpportunity = opportunities[0];
-  const additionalOpportunities = opportunities.slice(1);
-
-  const handleAccordionChange = (event, isExpanded) => {
-    // Pass the group signature and expansion state to parent
-    const signature = opportunities[0].match_signature || `unknown_${groupIndex}`;
-    onAccordionChange(signature, isExpanded);
+  // This is now a single opportunity with summary info
+  const hasAdditionalArbitrages = opportunity.total_arbitrages > 1;
+  
+  // Handle expansion - now triggers table replacement instead of accordion
+  const handleExpansionClick = () => {
+    if (onMatchExpand && hasAdditionalArbitrages) {
+      onMatchExpand(opportunity.match_signature);
+    }
   };
 
   // Move these handlers to component level
@@ -45,15 +63,65 @@ const ArbitrageRow = ({ opportunities, groupIndex, expandedAccordion, onAccordio
     setCalculatorOpportunity(null);
   };
 
-  // Check if this accordion should be expanded
-  const isExpanded = expandedAccordion === (opportunities[0].match_signature || `unknown_${groupIndex}`);
+  // Handle adding arbitrage to bets
+  const handleAddToBets = () => {
+    setModalOpen(true);
+  };
 
-  const renderOpportunityRows = (opportunity, opportunityIndex, isInAccordion = false) => {
+  const handleModalClose = () => {
+    setModalOpen(false);
+  };
+
+  const handleConfirmAddToBets = async (stakes) => {
+    try {
+      setAddingToBets(true);
+      
+      // Prepare arbitrage data for the API with custom stakes
+      const arbitrageData = {
+        match_signature: opportunity.match_signature,
+        combination_details: opportunity.combination_details,
+        profit: opportunity.arbitrage_percentage,
+        kickoff_datetime: opportunity.kickoff_datetime
+      };
+      
+      const response = await arbitrageService.addArbitrageDataToBets(arbitrageData, stakes);
+      
+      setNotification({
+        open: true,
+        message: `Successfully added ${response.bets_created} bets to your portfolio!`,
+        severity: 'success'
+      });
+      
+      setModalOpen(false);
+    } catch (error) {
+      console.error('Error adding arbitrage to bets:', error);
+      setNotification({
+        open: true,
+        message: error.response?.data?.error || 'Failed to add arbitrage to bets',
+        severity: 'error'
+      });
+    } finally {
+      setAddingToBets(false);
+    }
+  };
+
+  const handleNotificationClose = () => {
+    setNotification({ ...notification, open: false });
+  };
+
+  // Check if this accordion should be expanded
+  const isExpanded = expandedAccordion === opportunity.match_signature;
+
+  // Get match arbitrages data if available
+  const matchData = getMatchArbitrages(opportunity.match_signature);
+  const isLoading = isMatchLoading(opportunity.match_signature);
+
+  const renderOpportunityRows = (opp, opportunityIndex, isInAccordion = false) => {
     const { 
       arbitrage_percentage, 
       combination_details,
       match_info
-    } = opportunity;
+    } = opp;
 
     // Extract market from combination_details
     const market_name = combination_details?.[0]?.market || combination_details?.[0]?.market_name || 'Unknown Market';
@@ -72,7 +140,7 @@ const ArbitrageRow = ({ opportunities, groupIndex, expandedAccordion, onAccordio
       }
 
       // Fallback to extracting from match_signature or opportunity data
-      const signature = opportunity.match_signature || '';
+      const signature = opp.match_signature || '';
       const parts = signature.split(' vs ');
       if (parts.length >= 2) {
         const home_team = parts[0].trim();
@@ -80,8 +148,8 @@ const ArbitrageRow = ({ opportunities, groupIndex, expandedAccordion, onAccordio
         return {
           home_team,
           away_team,
-          league: opportunity.league || 'Unknown',
-          country: opportunity.country || 'Unknown'
+          league: opp.league || 'Unknown',
+          country: opp.country || 'Unknown'
         };
       }
 
@@ -91,7 +159,7 @@ const ArbitrageRow = ({ opportunities, groupIndex, expandedAccordion, onAccordio
     const formatKickoff = () => {
       // Try to get kickoff from multiple sources
       const kickoff = match_info?.kickoff_datetime || 
-                     opportunity.kickoff_datetime || 
+                     opp.kickoff_datetime || 
                      (combination_details?.[0]?.kickoff_datetime);
       
       if (!kickoff) return 'TBD';
@@ -357,21 +425,27 @@ const ArbitrageRow = ({ opportunities, groupIndex, expandedAccordion, onAccordio
                   }}
                 >
                   <Button 
-                    onClick={() => handleEventClick(combination_details[0].bookmaker)}
+                    onClick={handleAddToBets}
+                    disabled={addingToBets}
                     sx={{ 
-                      background: theme.palette.primary.main,
+                      background: theme.palette.success.main,
                       color: 'white',
                       border: 'none',
                       padding: '5px 10px',
                       borderRadius: '3px',
                       minWidth: 'auto',
+                      fontSize: '0.875rem',
                       '&:hover': {
-                        background: theme.palette.primary.dark
+                        background: theme.palette.success.dark
+                      },
+                      '&:disabled': {
+                        background: theme.palette.action.disabled,
+                        color: theme.palette.action.disabled
                       }
                     }}
-                    title="View match details"
+                    title="Add arbitrage bets to your portfolio"
                   >
-                    →
+                    Add Bets
                   </Button>
                 </TableCell>
               )}
@@ -382,9 +456,9 @@ const ArbitrageRow = ({ opportunities, groupIndex, expandedAccordion, onAccordio
     );
   };
 
-  // Get event string from best opportunity for use in Accordion label
+  // Get event string from the opportunity for use in Accordion label
   const event = (() => {
-    const detail = bestOpportunity.combination_details?.[0];
+    const detail = opportunity.combination_details?.[0];
     if (!detail) return '';
     const { home_team, away_team } = detail;
     return home_team && away_team ? `${home_team} – ${away_team}` : '';
@@ -393,70 +467,42 @@ const ArbitrageRow = ({ opportunities, groupIndex, expandedAccordion, onAccordio
   return (
     <>
       {/* Always show the best opportunity */}
-      {renderOpportunityRows(bestOpportunity, 0)}
+      {renderOpportunityRows(opportunity, 0)}
 
-      {/* Accordion for additional opportunities */}
-      {additionalOpportunities.length > 0 && (
-        <>
-          <TableRow>
-            <TableCell 
-              colSpan={8}
-              sx={{ 
-                padding: 0,
-                borderBottom: 'none',
-                backgroundColor: groupIndex % 2 === 0 ? theme.palette.grey[50] : theme.palette.background.paper
+      {/* Show expand row only if there are more arbitrages and not in expanded view */}
+      {hasAdditionalArbitrages && !isExpandedView && (
+        <TableRow>
+          <TableCell 
+            colSpan={8}
+            sx={{ 
+              padding: 1,
+              textAlign: 'right',
+              backgroundColor: groupIndex % 2 === 0 
+                ? theme.palette.action.hover 
+                : theme.palette.background.paper,
+              borderTop: `1px solid ${theme.palette.divider}`
+            }}
+          >
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleExpansionClick}
+              sx={{
+                textTransform: 'none',
+                fontSize: '0.875rem',
+                color: theme.palette.text.primary,
+                borderColor: theme.palette.divider,
+                '&:hover': {
+                  backgroundColor: theme.palette.action.hover,
+                  borderColor: theme.palette.primary.main,
+                  color: theme.palette.primary.main
+                }
               }}
             >
-              <Accordion
-                expanded={isExpanded}
-                onChange={handleAccordionChange}
-                sx={{
-                  '&:before': {
-                    display: 'none'
-                  },
-                  boxShadow: 'none',
-                  borderTop: `1px solid ${theme.palette.divider}`,
-                  backgroundColor: 'transparent'
-                }}
-              >
-                <AccordionSummary
-                  expandIcon={<ExpandMore />}
-                  sx={{
-                    backgroundColor: theme.palette.grey[100],
-                    minHeight: '48px',
-                    '&.Mui-expanded': {
-                      minHeight: '48px'
-                    },
-                    '& .MuiAccordionSummary-content': {
-                      alignItems: 'center',
-                      margin: '8px 0'
-                    }
-                  }}
-                >
-                  <Typography
-                    variant="body2"
-                    sx={{ 
-                      color: theme.palette.text.secondary,
-                      fontWeight: 500
-                    }}
-                  >
-                    Show {additionalOpportunities.length} more arbitrage opportunit{additionalOpportunities.length > 1 ? 'ies' : 'y'} for {event}
-                  </Typography>
-                </AccordionSummary>
-                
-                <AccordionDetails sx={{ padding: 0, backgroundColor: 'transparent' }}>
-                  <Table sx={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <TableBody>
-                      {additionalOpportunities.map((opportunity, index) => 
-                        renderOpportunityRows(opportunity, index + 1, true)
-                      )}
-                    </TableBody>
-                  </Table>
-                </AccordionDetails>
-              </Accordion>
-            </TableCell>
-          </TableRow>
-        </>
+              View {opportunity.total_arbitrages - 1} more
+            </Button>
+          </TableCell>
+        </TableRow>
       )}
       
       {/* Stake Calculator Modal */}
@@ -465,6 +511,31 @@ const ArbitrageRow = ({ opportunities, groupIndex, expandedAccordion, onAccordio
         onClose={handleCalculatorClose}
         opportunity={calculatorOpportunity}
       />
+
+      {/* Add to Bets Modal */}
+      <AddToBetsModal
+        open={modalOpen}
+        onClose={handleModalClose}
+        opportunity={opportunity}
+        onConfirm={handleConfirmAddToBets}
+        loading={addingToBets}
+      />
+
+      {/* Notification Snackbar */}
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={handleNotificationClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleNotificationClose} 
+          severity={notification.severity}
+          sx={{ width: '100%' }}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </>
   );
 };

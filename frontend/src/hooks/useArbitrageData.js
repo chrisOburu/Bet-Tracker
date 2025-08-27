@@ -1,16 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { arbitrageService } from '../services/arbitrageApi.js';
+import { getStoredMatchesPerPage, setStoredMatchesPerPage } from '../utils/localStorage.js';
 
 export const useArbitrageData = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastFetch, setLastFetch] = useState(null);
+  const [matchDetails, setMatchDetails] = useState({}); // Store detailed match data
+  const [loadingMatches, setLoadingMatches] = useState({}); // Track loading state for individual matches
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 0,
     totalItems: 0, // This will be total match groups
-    itemsPerPage: 10,
+    itemsPerPage: getStoredMatchesPerPage(10), // Load from localStorage
     hasNextPage: false,
     hasPrevPage: false,
     totalOpportunities: 0 // This will be total individual opportunities
@@ -22,7 +25,16 @@ export const useArbitrageData = () => {
     recentOpportunities: 0
   });
 
-  const fetchData = useCallback(async (page = 1, limit = 10, filters = {}) => {
+  // Function to update matches per page and store in localStorage
+  const updateMatchesPerPage = useCallback((newLimit) => {
+    setStoredMatchesPerPage(newLimit);
+    setPagination(prev => ({
+      ...prev,
+      itemsPerPage: newLimit
+    }));
+  }, []);
+
+  const fetchData = useCallback(async (page = 1, limit = getStoredMatchesPerPage(10), filters = {}) => {
     try {
       setLoading(true);
       setError(null);
@@ -87,24 +99,10 @@ export const useArbitrageData = () => {
               {'name': 'X', 'bookmaker': 'William Hill', 'odds': 3.2},
               {'name': '2', 'bookmaker': 'Ladbrokes', 'odds': 2.8}
             ],
-            all_opportunities: [
-              {
-                profit: 2.5,
-                arbitrage_percentage: 2.5,
-                league: 'Premier League',
-                country: 'England',
-                kickoff_datetime: new Date(Date.now() + 24*60*60*1000).toISOString(),
-                match_signature: 'Manchester United vs Arsenal - Match Result',
-                combination_details: [
-                  {'name': '1', 'bookmaker': 'Bet365', 'odds': 2.5},
-                  {'name': 'X', 'bookmaker': 'William Hill', 'odds': 3.2},
-                  {'name': '2', 'bookmaker': 'Ladbrokes', 'odds': 2.8}
-                ]
-              }
-            ],
-            total_opportunities: 1,
-            profit_range: { min: 2.5, max: 2.5 },
-            markets_count: 1
+            total_arbitrages: 3,
+            profit_range: { min: 2.5, max: 4.2 },
+            markets_count: 2,
+            markets: ['Match Result', 'Total Goals']
           },
           {
             arbitrage_percentage: 1.8,
@@ -121,23 +119,10 @@ export const useArbitrageData = () => {
               {'name': 'Over 2.5', 'bookmaker': 'Betfair', 'odds': 1.9},
               {'name': 'Under 2.5', 'bookmaker': 'Coral', 'odds': 2.1}
             ],
-            all_opportunities: [
-              {
-                profit: 1.8,
-                arbitrage_percentage: 1.8,
-                league: 'La Liga',
-                country: 'Spain',
-                kickoff_datetime: new Date(Date.now() + 48*60*60*1000).toISOString(),
-                match_signature: 'Barcelona vs Real Madrid - Total Goals',
-                combination_details: [
-                  {'name': 'Over 2.5', 'bookmaker': 'Betfair', 'odds': 1.9},
-                  {'name': 'Under 2.5', 'bookmaker': 'Coral', 'odds': 2.1}
-                ]
-              }
-            ],
-            total_opportunities: 1,
-            profit_range: { min: 1.8, max: 1.8 },
-            markets_count: 1
+            total_arbitrages: 2,
+            profit_range: { min: 1.8, max: 2.1 },
+            markets_count: 1,
+            markets: ['Total Goals']
           }
         ];
         
@@ -161,18 +146,34 @@ export const useArbitrageData = () => {
         return;
       }
       
-      // Transform grouped data to match expected frontend structure
+      // Transform grouped data to match expected frontend structure - optimized version
       const transformedData = groupedResponse.groups.map(group => {
         const bestArbitrage = group.best_arbitrage || {};
-        const allArbitrages = group.all_arbitrages || [];
         
-        // Create a structured data format
+        // Extract league and country from combination_details
+        let league = 'Unknown';
+        let country = 'Unknown';
+        
+        try {
+          const combinationDetails = typeof bestArbitrage.combination_details === 'string' 
+            ? JSON.parse(bestArbitrage.combination_details) 
+            : (bestArbitrage.combination_details || []);
+          
+          if (combinationDetails.length > 0) {
+            league = combinationDetails[0].league || 'Unknown';
+            country = combinationDetails[0].country || 'Unknown';
+          }
+        } catch (error) {
+          console.warn('Error parsing combination_details:', error);
+        }
+        
+        // Create a structured data format without all_arbitrages
         return {
           arbitrage_percentage: bestArbitrage.profit || 0,
           match_signature: group.match_signature || '',
-          league: bestArbitrage.league || 'Unknown',
-          country: bestArbitrage.country || 'Unknown',
-          kickoff_datetime: bestArbitrage.kickoff_datetime || null, // Add kickoff at top level
+          league: league,
+          country: country,
+          kickoff_datetime: bestArbitrage.kickoff_datetime || null,
           match_info: {
             match_signature: group.match_signature || '',
             kickoff_datetime: bestArbitrage.kickoff_datetime || null,
@@ -181,24 +182,14 @@ export const useArbitrageData = () => {
           combination_details: typeof bestArbitrage.combination_details === 'string' 
             ? JSON.parse(bestArbitrage.combination_details) 
             : (bestArbitrage.combination_details || []),
-          // Store all arbitrages for this match signature
-          all_opportunities: allArbitrages.map(arb => ({
-            ...arb,
-            arbitrage_percentage: arb.profit || 0,
-            league: arb.league || bestArbitrage.league || 'Unknown',
-            country: arb.country || bestArbitrage.country || 'Unknown',
-            kickoff_datetime: arb.kickoff_datetime || bestArbitrage.kickoff_datetime || null,
-            match_signature: arb.match_signature || group.match_signature,
-            combination_details: typeof arb.combination_details === 'string' 
-              ? JSON.parse(arb.combination_details) 
-              : (arb.combination_details || [])
-          })),
-          total_opportunities: group.total_opportunities,
+          // Only store summary info about additional opportunities
+          total_arbitrages: group.total_arbitrages || 0,
           profit_range: {
             min: group.min_profit,
             max: group.max_profit
           },
-          markets_count: group.markets_count
+          markets_count: group.markets_count || 0,
+          markets: group.markets || []
         };
       });
       
@@ -212,7 +203,7 @@ export const useArbitrageData = () => {
         itemsPerPage: groupedResponse.pagination.per_page,
         hasNextPage: groupedResponse.pagination.has_next,
         hasPrevPage: groupedResponse.pagination.has_prev,
-        totalOpportunities: transformedData.reduce((sum, group) => sum + group.total_opportunities, 0)
+        totalOpportunities: transformedData.reduce((sum, group) => sum + group.total_arbitrages, 0)
       });
       
       setLastFetch(new Date());
@@ -248,6 +239,64 @@ export const useArbitrageData = () => {
     }
   }, [fetchData, pagination.currentPage, pagination.itemsPerPage]);
 
+  const fetchMatchArbitrages = useCallback(async (matchSignature) => {
+    try {
+      setLoadingMatches(prev => ({ ...prev, [matchSignature]: true }));
+      
+      // Check if we already have the data cached
+      if (matchDetails[matchSignature]) {
+        return matchDetails[matchSignature];
+      }
+      
+      const response = await arbitrageService.getArbitragesByMatchSignature(matchSignature);
+      
+      if (!response || !response.arbitrages) {
+        throw new Error('Invalid response from match arbitrages API');
+      }
+      
+      // Transform the data to match frontend expectations
+      const transformedArbitrages = response.arbitrages.map(arb => ({
+        ...arb,
+        arbitrage_percentage: arb.profit || 0,
+        combination_details: typeof arb.combination_details === 'string' 
+          ? JSON.parse(arb.combination_details) 
+          : (arb.combination_details || [])
+      }));
+      
+      const matchData = {
+        arbitrages: transformedArbitrages,
+        markets_data: response.markets_data || {},
+        total_count: response.total_count || 0,
+        max_profit: response.max_profit || 0,
+        min_profit: response.min_profit || 0,
+        markets: response.markets || [],
+        match_info: response.match_info || {}
+      };
+      
+      // Cache the data
+      setMatchDetails(prev => ({
+        ...prev,
+        [matchSignature]: matchData
+      }));
+      
+      return matchData;
+      
+    } catch (err) {
+      console.error(`Error fetching arbitrages for match ${matchSignature}:`, err);
+      throw err;
+    } finally {
+      setLoadingMatches(prev => ({ ...prev, [matchSignature]: false }));
+    }
+  }, [matchDetails]);
+
+  const getMatchArbitrages = useCallback((matchSignature) => {
+    return matchDetails[matchSignature] || null;
+  }, [matchDetails]);
+
+  const isMatchLoading = useCallback((matchSignature) => {
+    return loadingMatches[matchSignature] || false;
+  }, [loadingMatches]);
+
   const fetchTopOpportunities = useCallback(async (limit = 10) => {
     try {
       const response = await arbitrageService.getGroupedArbitrages({
@@ -264,8 +313,9 @@ export const useArbitrageData = () => {
   }, []);
 
   useEffect(() => {
-    // Initial fetch only
-    fetchData();
+    // Initial fetch with stored preferences
+    const storedLimit = getStoredMatchesPerPage(10);
+    fetchData(1, storedLimit);
 
     // Set up interval to fetch every hour (3600000ms)
     const interval = setInterval(() => {
@@ -285,6 +335,10 @@ export const useArbitrageData = () => {
     stats,
     refetch,
     reloadData,
-    fetchTopOpportunities
+    fetchTopOpportunities,
+    fetchMatchArbitrages,
+    getMatchArbitrages,
+    isMatchLoading,
+    updateMatchesPerPage
   };
 };

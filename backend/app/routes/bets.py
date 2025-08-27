@@ -8,9 +8,14 @@ bets_bp = Blueprint('bets', __name__)
 
 @bets_bp.route('/bets', methods=['GET'])
 def get_bets():
-    """Get all bets with optional filtering"""
+    """Get all bets with optional filtering and pagination"""
     status = request.args.get('status')
     sport = request.args.get('sport')
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    
+    # Limit per_page to prevent abuse
+    per_page = min(per_page, 100)
     
     query = Bet.query
     
@@ -21,14 +26,32 @@ def get_bets():
     
     # Order by: pending bets first (status='pending' gets priority 0, others get priority 1)
     # Then by date_placed descending (newest first)
-    bets = query.order_by(
+    query = query.order_by(
         case(
             (Bet.status == 'pending', 0),
             else_=1
         ),
         desc(Bet.date_placed)
-    ).all()
-    return jsonify([bet.to_dict() for bet in bets])
+    )
+    
+    # Apply pagination
+    paginated = query.paginate(
+        page=page,
+        per_page=per_page,
+        error_out=False
+    )
+    
+    return jsonify({
+        'bets': [bet.to_dict() for bet in paginated.items],
+        'pagination': {
+            'page': page,
+            'per_page': per_page,
+            'total': paginated.total,
+            'pages': paginated.pages,
+            'has_next': paginated.has_next,
+            'has_prev': paginated.has_prev
+        }
+    })
 
 @bets_bp.route('/bets', methods=['POST'])
 def create_bet():
@@ -97,9 +120,17 @@ def update_bet(bet_id):
                 bet.actual_payout = data.get('actual_payout', bet.potential_payout)
                 bet.profit_loss = bet.actual_payout - bet.stake
                 bet.date_settled = datetime.utcnow()
+            elif data['status'] == 'half_won':
+                bet.actual_payout = data.get('actual_payout', (bet.potential_payout + bet.stake) / 2)
+                bet.profit_loss = bet.actual_payout - bet.stake
+                bet.date_settled = datetime.utcnow()
             elif data['status'] == 'lost':
                 bet.actual_payout = 0
                 bet.profit_loss = -bet.stake
+                bet.date_settled = datetime.utcnow()
+            elif data['status'] == 'half_lost':
+                bet.actual_payout = bet.stake / 2  # Get back half the stake
+                bet.profit_loss = bet.actual_payout - bet.stake  # This will be negative (loss)
                 bet.date_settled = datetime.utcnow()
             elif data['status'] == 'void':
                 bet.actual_payout = bet.stake  # Stake returned
@@ -131,9 +162,9 @@ def delete_bet(bet_id):
 def get_stats():
     """Get betting statistics"""
     all_bets = Bet.query.all()
-    settled_bets = Bet.query.filter(Bet.status.in_(['won', 'lost', 'void'])).all()
-    won_bets = Bet.query.filter(Bet.status == 'won').all()
-    lost_bets = Bet.query.filter(Bet.status == 'lost').all()
+    settled_bets = Bet.query.filter(Bet.status.in_(['won', 'half_won', 'lost', 'half_lost', 'void'])).all()
+    won_bets = Bet.query.filter(Bet.status.in_(['won', 'half_won'])).all()
+    lost_bets = Bet.query.filter(Bet.status.in_(['lost', 'half_lost'])).all()
     
     total_bets = len(all_bets)
     total_settled = len(settled_bets)
@@ -163,9 +194,9 @@ def get_stats():
         sports_stats[bet.sport]['total_staked'] += bet.stake
         sports_stats[bet.sport]['profit_loss'] += bet.profit_loss
         
-        if bet.status == 'won':
+        if bet.status in ['won', 'half_won']:
             sports_stats[bet.sport]['won'] += 1
-        elif bet.status == 'lost':
+        elif bet.status in ['lost', 'half_lost']:
             sports_stats[bet.sport]['lost'] += 1
     
     return jsonify({

@@ -8,6 +8,8 @@ class Transaction(db.Model):
     transaction_type = db.Column(db.String(20), nullable=False)  # 'deposit' or 'withdrawal'
     sportsbook = db.Column(db.String(100), nullable=False)
     amount = db.Column(db.Float, nullable=False)
+    tax = db.Column(db.Float, nullable=False, default=0.0)  # 5% of amount
+    transaction_charges = db.Column(db.Float, nullable=False, default=0.0)  # defaults to 115
     payment_method = db.Column(db.String(50), nullable=True)  # 'bank_transfer', 'credit_card', 'crypto', etc.
     reference_id = db.Column(db.String(100), nullable=True)  # transaction reference from sportsbook
     status = db.Column(db.String(20), default='completed')  # 'pending', 'completed', 'failed'
@@ -21,6 +23,8 @@ class Transaction(db.Model):
             'transaction_type': self.transaction_type,
             'sportsbook': self.sportsbook,
             'amount': self.amount,
+            'tax': self.tax,
+            'transaction_charges': self.transaction_charges,
             'payment_method': self.payment_method,
             'reference_id': self.reference_id,
             'status': self.status,

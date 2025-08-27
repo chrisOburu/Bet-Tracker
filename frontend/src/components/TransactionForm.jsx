@@ -21,6 +21,8 @@ const TransactionForm = ({ open, onClose, transaction, onSaved }) => {
     transaction_type: transaction?.transaction_type || 'deposit',
     sportsbook: transaction?.sportsbook || '',
     amount: transaction?.amount || '',
+    tax: transaction?.tax || '',
+    transaction_charges: transaction?.transaction_charges || '',
     payment_method: transaction?.payment_method || '',
     reference_id: transaction?.reference_id || '',
     status: transaction?.status || 'completed',
@@ -60,6 +62,14 @@ const TransactionForm = ({ open, onClose, transaction, onSaved }) => {
       newErrors.amount = 'Valid amount is required';
     }
 
+    if (formData.tax && parseFloat(formData.tax) < 0) {
+      newErrors.tax = 'Tax cannot be negative';
+    }
+
+    if (formData.transaction_charges && parseFloat(formData.transaction_charges) < 0) {
+      newErrors.transaction_charges = 'Transaction charges cannot be negative';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -76,7 +86,9 @@ const TransactionForm = ({ open, onClose, transaction, onSaved }) => {
     try {
       const transactionData = {
         ...formData,
-        amount: parseFloat(formData.amount)
+        amount: parseFloat(formData.amount),
+        tax: formData.tax ? parseFloat(formData.tax) : 0,
+        transaction_charges: formData.transaction_charges ? parseFloat(formData.transaction_charges) : 0
       };
 
       if (transaction) {
@@ -93,6 +105,8 @@ const TransactionForm = ({ open, onClose, transaction, onSaved }) => {
         transaction_type: 'deposit',
         sportsbook: '',
         amount: '',
+        tax: '',
+        transaction_charges: '',
         payment_method: '',
         reference_id: '',
         status: 'completed',
@@ -178,6 +192,34 @@ const TransactionForm = ({ open, onClose, transaction, onSaved }) => {
               onChange={handleInputChange('amount')}
               error={!!errors.amount}
               helperText={errors.amount}
+              InputProps={{
+                startAdornment: <InputAdornment position="start">$</InputAdornment>,
+              }}
+            />
+
+            <TextField
+              fullWidth
+              label="Tax"
+              type="number"
+              step="0.01"
+              value={formData.tax}
+              onChange={handleInputChange('tax')}
+              error={!!errors.tax}
+              helperText={errors.tax || "Tax amount (leave empty for no tax)"}
+              InputProps={{
+                startAdornment: <InputAdornment position="start">$</InputAdornment>,
+              }}
+            />
+
+            <TextField
+              fullWidth
+              label="Transaction Charges"
+              type="number"
+              step="0.01"
+              value={formData.transaction_charges}
+              onChange={handleInputChange('transaction_charges')}
+              error={!!errors.transaction_charges}
+              helperText={errors.transaction_charges || "Processing fees or charges (leave empty for no charges)"}
               InputProps={{
                 startAdornment: <InputAdornment position="start">$</InputAdornment>,
               }}

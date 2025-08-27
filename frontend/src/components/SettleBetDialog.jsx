@@ -37,6 +37,16 @@ const SettleBetDialog = ({ open, onClose, bet, onSettled }) => {
       
       if (status === 'won' && actualPayout) {
         updateData.actual_payout = parseFloat(actualPayout);
+      } else if (status === 'half_won') {
+        if (actualPayout) {
+          updateData.actual_payout = parseFloat(actualPayout);
+        } else {
+          // For half win: get back stake + half the profit
+          updateData.actual_payout = (bet.potential_payout + bet.stake) / 2;
+        }
+      } else if (status === 'half_lost') {
+        // For half loss: lose half the stake, get back the other half
+        updateData.actual_payout = bet.stake / 2;
       }
 
       await betService.updateBet(bet.id, updateData);
@@ -86,12 +96,14 @@ const SettleBetDialog = ({ open, onClose, bet, onSettled }) => {
             label="Result"
           >
             <MenuItem value="won">Won</MenuItem>
+            <MenuItem value="half_won">Half Won</MenuItem>
             <MenuItem value="lost">Lost</MenuItem>
+            <MenuItem value="half_lost">Half Lost</MenuItem>
             <MenuItem value="void">Void/Push</MenuItem>
           </Select>
         </FormControl>
 
-        {status === 'won' && (
+        {(status === 'won' || status === 'half_won') && (
           <TextField
             fullWidth
             label="Actual Payout (optional)"
@@ -99,15 +111,24 @@ const SettleBetDialog = ({ open, onClose, bet, onSettled }) => {
             step="0.01"
             value={actualPayout}
             onChange={(e) => setActualPayout(e.target.value)}
-            helperText={`Leave empty to use potential payout ($${bet.potential_payout})`}
+            helperText={`Leave empty to use ${status === 'half_won' ? 'calculated half win' : 'potential'} payout ($${status === 'half_won' ? ((bet.potential_payout + bet.stake) / 2).toFixed(2) : bet.potential_payout})`}
           />
         )}
 
         {status && (
-          <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+          <Box sx={{ 
+            mt: 2, 
+            p: 2, 
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'grey.800' : 'grey.100', 
+            borderRadius: 1 
+          }}>
             <Typography variant="h6">
               {status === 'won' && `Profit: $${((actualPayout || bet.potential_payout) - bet.stake).toFixed(2)}`}
+              {status === 'half_won' && `Profit: $${(
+                (actualPayout || ((bet.potential_payout + bet.stake) / 2)) - bet.stake
+              ).toFixed(2)}`}
               {status === 'lost' && `Loss: -$${bet.stake}`}
+              {status === 'half_lost' && `Loss: -$${(bet.stake / 2).toFixed(2)}`}
               {status === 'void' && `Refund: $${bet.stake}`}
             </Typography>
           </Box>

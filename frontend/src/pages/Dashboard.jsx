@@ -35,11 +35,13 @@ const Dashboard = () => {
     try {
       const [statsResponse, betsResponse] = await Promise.all([
         betService.getStats(),
-        betService.getBets()
+        betService.getBets({ per_page: 5 }) // Get only 5 recent bets for dashboard
       ]);
       
       setStats(statsResponse.data);
-      setRecentBets(betsResponse.data.slice(0, 5)); // Last 5 bets
+      // Handle the new paginated response format
+      const betsData = betsResponse.data.bets || betsResponse.data;
+      setRecentBets(Array.isArray(betsData) ? betsData : []);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);

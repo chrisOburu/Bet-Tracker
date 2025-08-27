@@ -23,6 +23,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Pagination,
+  Stack,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -35,6 +37,7 @@ import {
 import { betService } from '../services/api.js';
 import BetForm from '../components/BetForm.jsx';
 import SettleBetDialog from '../components/SettleBetDialog.jsx';
+import { getBookmakerLink } from '../utils/bookmakerMapper.js';
 
 const BetList = () => {
   const [bets, setBets] = useState([]);
@@ -50,21 +53,45 @@ const BetList = () => {
     sport: '',
   });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, bet: null });
+  const [pagination, setPagination] = useState({
+    page: 1,
+    per_page: 50,
+    total: 0,
+    pages: 0,
+    has_next: false,
+    has_prev: false
+  });
 
   useEffect(() => {
     fetchBets();
-  }, [filters]);
+  }, [filters, pagination.page]);
 
   const fetchBets = async () => {
     try {
       setLoading(true);
-      const response = await betService.getBets(filters);
-      setBets(response.data);
+      const queryParams = {
+        ...filters,
+        page: pagination.page,
+        per_page: pagination.per_page
+      };
+      const response = await betService.getBets(queryParams);
+      setBets(response.data.bets);
+      setPagination(prev => ({
+        ...prev,
+        ...response.data.pagination
+      }));
     } catch (error) {
       console.error('Error fetching bets:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePageChange = (event, newPage) => {
+    setPagination(prev => ({
+      ...prev,
+      page: newPage
+    }));
   };
 
   const handleMenuOpen = (event, bet) => {
@@ -107,7 +134,9 @@ const BetList = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'won': return 'success';
+      case 'half_won': return 'success';
       case 'lost': return 'error';
+      case 'half_lost': return 'error';
       case 'void': return 'warning';
       default: return 'default';
     }
@@ -169,13 +198,18 @@ const BetList = () => {
               <InputLabel>Status</InputLabel>
               <Select
                 value={filters.status}
-                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                onChange={(e) => {
+                  setFilters(prev => ({ ...prev, status: e.target.value }));
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                }}
                 label="Status"
               >
                 <MenuItem value="">All</MenuItem>
                 <MenuItem value="pending">Pending</MenuItem>
                 <MenuItem value="won">Won</MenuItem>
+                <MenuItem value="half_won">Half Won</MenuItem>
                 <MenuItem value="lost">Lost</MenuItem>
+                <MenuItem value="half_lost">Half Lost</MenuItem>
                 <MenuItem value="void">Void</MenuItem>
               </Select>
             </FormControl>
@@ -185,7 +219,10 @@ const BetList = () => {
               <InputLabel>Sport</InputLabel>
               <Select
                 value={filters.sport}
-                onChange={(e) => setFilters(prev => ({ ...prev, sport: e.target.value }))}
+                onChange={(e) => {
+                  setFilters(prev => ({ ...prev, sport: e.target.value }));
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                }}
                 label="Sport"
               >
                 <MenuItem value="">All</MenuItem>
@@ -200,7 +237,10 @@ const BetList = () => {
           <Grid item>
             <Button
               variant="outlined"
-              onClick={() => setFilters({ status: '', sport: '' })}
+              onClick={() => {
+                setFilters({ status: '', sport: '' });
+                setPagination(prev => ({ ...prev, page: 1 }));
+              }}
             >
               Clear Filters
             </Button>
@@ -271,7 +311,24 @@ const BetList = () => {
                   </TableCell>
                   <TableCell>{bet.selection}</TableCell>
                   <TableCell>
-                    <Chip label={bet.sportsbook} size="small" variant="outlined" color="primary" />
+                    <Chip 
+                      label={bet.sportsbook} 
+                      size="small" 
+                      variant="outlined" 
+                      color="primary"
+                      onClick={() => {
+                        const url = getBookmakerLink(bet.sportsbook);
+                        if (url && url !== '#') {
+                          window.open(url, '_blank', 'noopener,noreferrer');
+                        }
+                      }}
+                      sx={{ 
+                        cursor: getBookmakerLink(bet.sportsbook) !== '#' ? 'pointer' : 'default',
+                        '&:hover': {
+                          backgroundColor: getBookmakerLink(bet.sportsbook) !== '#' ? 'primary.light' : 'inherit',
+                        }
+                      }}
+                    />
                   </TableCell>
                   <TableCell>
                     {bet.kickoff ? (
@@ -330,6 +387,26 @@ const BetList = () => {
         </Table>
       </TableContainer>
 
+      {/* Pagination and Summary */}
+      {!loading && bets.length > 0 && (
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="body2" color="text.secondary">
+            Showing {((pagination.page - 1) * pagination.per_page) + 1} to {Math.min(pagination.page * pagination.per_page, pagination.total)} of {pagination.total} bets
+          </Typography>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Pagination
+              count={pagination.pages}
+              page={pagination.page}
+              onChange={handlePageChange}
+              color="primary"
+              size="medium"
+              showFirstButton
+              showLastButton
+            />
+          </Stack>
+        </Box>
+      )}
+
       {/* Action Menu */}
       <Menu
         anchorEl={anchorEl}
@@ -340,10 +417,10 @@ const BetList = () => {
           <EditIcon sx={{ mr: 1 }} />
           Edit
         </MenuItem>
-        {selectedBet?.status === 'pending' && (
+        {selectedBet?.status !== undefined && (
           <MenuItem onClick={handleSettle}>
             <CheckIcon sx={{ mr: 1 }} />
-            Settle
+            {selectedBet?.status === 'pending' ? 'Settle' : 'Re-settle'}
           </MenuItem>
         )}
         <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
