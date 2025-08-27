@@ -12,10 +12,16 @@ export const betService = {
     const params = new URLSearchParams();
     if (filters.status) params.append('status', filters.status);
     if (filters.sport) params.append('sport', filters.sport);
+    if (filters.sportsbook) params.append('sportsbook', filters.sportsbook);
     if (filters.page) params.append('page', filters.page);
     if (filters.per_page) params.append('per_page', filters.per_page);
     
     return api.get(`/bets?${params.toString()}`);
+  },
+
+  // Get filter options
+  getFilterOptions: () => {
+    return api.get('/bets/filters');
   },
 
   // Create a new bet

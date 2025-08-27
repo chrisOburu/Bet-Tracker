@@ -11,6 +11,7 @@ def get_bets():
     """Get all bets with optional filtering and pagination"""
     status = request.args.get('status')
     sport = request.args.get('sport')
+    sportsbook = request.args.get('sportsbook')
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
     
@@ -23,6 +24,8 @@ def get_bets():
         query = query.filter(Bet.status == status)
     if sport:
         query = query.filter(Bet.sport == sport)
+    if sportsbook:
+        query = query.filter(Bet.sportsbook == sportsbook)
     
     # Order by: pending bets first (status='pending' gets priority 0, others get priority 1)
     # Then by date_placed descending (newest first)
@@ -51,6 +54,17 @@ def get_bets():
             'has_next': paginated.has_next,
             'has_prev': paginated.has_prev
         }
+    })
+
+@bets_bp.route('/bets/filters', methods=['GET'])
+def get_filter_options():
+    """Get all available filter options (sports and sportsbooks)"""
+    sports = db.session.query(Bet.sport).distinct().filter(Bet.sport.isnot(None)).all()
+    sportsbooks = db.session.query(Bet.sportsbook).distinct().filter(Bet.sportsbook.isnot(None)).all()
+    
+    return jsonify({
+        'sports': [sport[0] for sport in sports if sport[0]],
+        'sportsbooks': [sportsbook[0] for sportsbook in sportsbooks if sportsbook[0]]
     })
 
 @bets_bp.route('/bets', methods=['POST'])

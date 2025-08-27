@@ -133,7 +133,10 @@ All dummy data created successfully!")ration"""
             
             # Determine status (70% settled, 30% pending)
             if random.random() < 0.7:  # 70% chance of being settled
-                status = random.choices(['won', 'lost', 'void'], weights=[40, 55, 5])[0]
+                status = random.choices(
+                    ['won', 'half_won', 'lost', 'half_lost', 'void'], 
+                    weights=[35, 10, 40, 10, 5]
+                )[0]
                 # Settlement date is 1-7 days after placement, with random time
                 settlement_hours = random.randint(1, 168)  # 1 hour to 7 days
                 settlement_minutes = random.randint(0, 59)
@@ -143,9 +146,15 @@ All dummy data created successfully!")ration"""
                 if status == 'won':
                     actual_payout = potential_payout
                     profit_loss = actual_payout - stake
+                elif status == 'half_won':
+                    actual_payout = (potential_payout + stake) / 2  # Get back stake + half the profit
+                    profit_loss = actual_payout - stake
                 elif status == 'lost':
                     actual_payout = 0
                     profit_loss = -stake
+                elif status == 'half_lost':
+                    actual_payout = stake / 2  # Get back half the stake
+                    profit_loss = actual_payout - stake  # This will be negative
                 else:  # void
                     actual_payout = stake
                     profit_loss = 0
@@ -201,17 +210,19 @@ All dummy data created successfully!")ration"""
         # Print summary statistics
         total_bets = len(bets_to_create)
         settled_bets = [bet for bet in bets_to_create if bet.status != 'pending']
-        won_bets = [bet for bet in bets_to_create if bet.status == 'won']
-        lost_bets = [bet for bet in bets_to_create if bet.status == 'lost']
+        won_bets = [bet for bet in bets_to_create if bet.status in ['won', 'half_won']]
+        lost_bets = [bet for bet in bets_to_create if bet.status in ['lost', 'half_lost']]
+        void_bets = [bet for bet in bets_to_create if bet.status == 'void']
         
         total_staked = sum(bet.stake for bet in bets_to_create)
         total_profit_loss = sum(bet.profit_loss for bet in settled_bets)
         
-        print(f"\nSummary:")
+        print(f"\nBet Summary:")
         print(f"Total Bets: {total_bets}")
         print(f"Settled Bets: {len(settled_bets)}")
-        print(f"Won: {len(won_bets)}")
-        print(f"Lost: {len(lost_bets)}")
+        print(f"Won (Full + Half): {len(won_bets)}")
+        print(f"Lost (Full + Half): {len(lost_bets)}")
+        print(f"Void: {len(void_bets)}")
         print(f"Pending: {total_bets - len(settled_bets)}")
         print(f"Total Staked: ${total_staked:.2f}")
         print(f"Total P&L: ${total_profit_loss:.2f}")
@@ -266,6 +277,22 @@ def create_dummy_transactions():
         else:
             amount = round(random.uniform(25, 1500), 2)  # Withdrawals: $25-$1500
         
+        # Calculate tax and transaction charges
+        # Tax: 0-10% of amount (most commonly 0-5%)
+        tax = round(random.uniform(0, amount * 0.1), 2) if random.random() < 0.7 else 0
+        
+        # Transaction charges: $0-$25 for most transactions, occasionally higher
+        if amount > 1000:
+            transaction_charges = round(random.uniform(5, 50), 2)  # Higher amounts have higher fees
+        elif amount > 500:
+            transaction_charges = round(random.uniform(2, 25), 2)
+        else:
+            transaction_charges = round(random.uniform(0, 15), 2)
+        
+        # Some transactions have no fees (promotional/VIP accounts)
+        if random.random() < 0.2:  # 20% chance of no fees
+            transaction_charges = 0
+        
         # Date processed (for completed transactions)
         date_processed = None
         if status == 'completed':
@@ -300,6 +327,8 @@ def create_dummy_transactions():
             transaction_type=transaction_type,
             sportsbook=sportsbook,
             amount=amount,
+            tax=tax,
+            transaction_charges=transaction_charges,
             payment_method=payment_method,
             reference_id=reference_id,
             status=status,
@@ -318,6 +347,9 @@ def create_dummy_transactions():
     completed_transactions = [t for t in transactions if t.status == 'completed']
     total_deposits = sum(t.amount for t in completed_transactions if t.transaction_type == 'deposit')
     total_withdrawals = sum(t.amount for t in completed_transactions if t.transaction_type == 'withdrawal')
+    total_tax = sum(t.tax for t in completed_transactions)
+    total_charges = sum(t.transaction_charges for t in completed_transactions)
+    net_position = total_withdrawals - total_deposits - total_tax - total_charges
     
     print(f"""
 Transaction Summary:
@@ -327,7 +359,9 @@ Pending: {len([t for t in transactions if t.status == 'pending'])}
 Failed: {len([t for t in transactions if t.status == 'failed'])}
 Total Deposits: ${total_deposits:,.2f}
 Total Withdrawals: ${total_withdrawals:,.2f}
-Net Position: ${total_deposits - total_withdrawals:,.2f}
+Total Tax: ${total_tax:,.2f}
+Total Charges: ${total_charges:,.2f}
+Net Position: ${net_position:,.2f}
 """)
 
 

@@ -51,6 +51,11 @@ const BetList = () => {
   const [filters, setFilters] = useState({
     status: '',
     sport: '',
+    sportsbook: '',
+  });
+  const [filterOptions, setFilterOptions] = useState({
+    sports: [],
+    sportsbooks: []
   });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, bet: null });
   const [pagination, setPagination] = useState({
@@ -63,8 +68,18 @@ const BetList = () => {
   });
 
   useEffect(() => {
+    fetchFilterOptions();
     fetchBets();
   }, [filters, pagination.page]);
+
+  const fetchFilterOptions = async () => {
+    try {
+      const response = await betService.getFilterOptions();
+      setFilterOptions(response.data);
+    } catch (error) {
+      console.error('Error fetching filter options:', error);
+    }
+  };
 
   const fetchBets = async () => {
     try {
@@ -85,6 +100,11 @@ const BetList = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBetFormSubmit = () => {
+    fetchBets();
+    fetchFilterOptions(); // Refresh filter options when bets change
   };
 
   const handlePageChange = (event, newPage) => {
@@ -125,6 +145,7 @@ const BetList = () => {
     try {
       await betService.deleteBet(deleteDialog.bet.id);
       fetchBets();
+      fetchFilterOptions(); // Refresh filter options when bet is deleted
       setDeleteDialog({ open: false, bet: null });
     } catch (error) {
       console.error('Error deleting bet:', error);
@@ -139,6 +160,18 @@ const BetList = () => {
       case 'half_lost': return 'error';
       case 'void': return 'warning';
       default: return 'default';
+    }
+  };
+
+  const getStatusAbbreviation = (status) => {
+    switch (status) {
+      case 'won': return 'W';
+      case 'half_won': return 'HW';
+      case 'lost': return 'L';
+      case 'half_lost': return 'HL';
+      case 'void': return 'V';
+      case 'pending': return 'P';
+      default: return status?.charAt(0)?.toUpperCase() || 'P';
     }
   };
 
@@ -169,8 +202,6 @@ const BetList = () => {
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString();
   };
-
-  const uniqueSports = [...new Set(bets.map(bet => bet.sport))];
 
   return (
     <Box>
@@ -226,9 +257,29 @@ const BetList = () => {
                 label="Sport"
               >
                 <MenuItem value="">All</MenuItem>
-                {uniqueSports.map((sport) => (
+                {filterOptions.sports.map((sport) => (
                   <MenuItem key={sport} value={sport}>
                     {sport}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Sportsbook</InputLabel>
+              <Select
+                value={filters.sportsbook}
+                onChange={(e) => {
+                  setFilters(prev => ({ ...prev, sportsbook: e.target.value }));
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                }}
+                label="Sportsbook"
+              >
+                <MenuItem value="">All</MenuItem>
+                {filterOptions.sportsbooks.map((sportsbook) => (
+                  <MenuItem key={sportsbook} value={sportsbook}>
+                    {sportsbook}
                   </MenuItem>
                 ))}
               </Select>
@@ -238,7 +289,7 @@ const BetList = () => {
             <Button
               variant="outlined"
               onClick={() => {
-                setFilters({ status: '', sport: '' });
+                setFilters({ status: '', sport: '', sportsbook: '' });
                 setPagination(prev => ({ ...prev, page: 1 }));
               }}
             >
@@ -365,7 +416,7 @@ const BetList = () => {
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={bet.status}
+                      label={getStatusAbbreviation(bet.status)}
                       color={getStatusColor(bet.status)}
                       size="small"
                     />
@@ -436,7 +487,7 @@ const BetList = () => {
           setShowBetForm(false);
           setEditingBet(null);
         }}
-        onSubmit={fetchBets}
+        onSubmit={handleBetFormSubmit}
         bet={editingBet}
       />
 
@@ -448,7 +499,7 @@ const BetList = () => {
           setSettlingBet(null);
         }}
         bet={settlingBet}
-        onSettled={fetchBets}
+        onSettled={handleBetFormSubmit}
       />
 
       {/* Delete Confirmation Dialog */}
