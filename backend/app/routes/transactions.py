@@ -1,9 +1,60 @@
 from flask import Blueprint, request, jsonify
 from app import db
 from app.models.transaction import Transaction
+from app.models.account import Account
+from app.models.sportsbook import Sportsbook
 from datetime import datetime
 
 transactions_bp = Blueprint('transactions', __name__)
+
+def resolve_sportsbook_id(sportsbook_input):
+    """
+    Resolve sportsbook ID from either ID or name.
+    Returns (sportsbook_id, sportsbook_name) tuple or (None, None) if not found.
+    Creates sportsbook if it doesn't exist.
+    """
+    if not sportsbook_input:
+        return None, None
+    
+    # If it's a number, treat it as ID
+    if str(sportsbook_input).isdigit():
+        sportsbook = Sportsbook.query.get(int(sportsbook_input))
+        if sportsbook:
+            return sportsbook.id, sportsbook.name
+    
+    # Otherwise, treat it as name and try to find it
+    sportsbook = Sportsbook.get_by_name(str(sportsbook_input))
+    if sportsbook:
+        return sportsbook.id, sportsbook.name
+    
+    # If not found, create new sportsbook
+    sportsbook = Sportsbook.create_if_not_exists(str(sportsbook_input))
+    db.session.add(sportsbook)
+    db.session.flush()  # Get the ID without committing
+    return sportsbook.id, sportsbook.name
+
+def resolve_account_id(account_input):
+    """
+    Resolve account ID from either ID or identifier.
+    Returns (account_id, account_identifier) tuple or (None, None) if not found.
+    """
+    if not account_input:
+        return None, None
+    
+    # If it's a number, treat it as ID
+    if str(account_input).isdigit():
+        account = Account.query.get(int(account_input))
+        if account:
+            return account.id, account.account_identifier
+    
+    # Otherwise, treat it as identifier and try to find it
+    account = Account.query.filter_by(account_identifier=str(account_input)).first()
+    if account:
+        return account.id, account.account_identifier
+    
+    # If not found, return None (don't auto-create accounts)
+    return None, None
+    return None
 
 @transactions_bp.route('/transactions', methods=['GET'])
 def get_transactions():
@@ -28,7 +79,8 @@ def get_transactions():
             query = query.filter(Transaction.transaction_type == transaction_type)
         
         if sportsbook:
-            query = query.filter(Transaction.sportsbook.ilike(f'%{sportsbook}%'))
+            # Filter by sportsbook name through the relationship
+            query = query.join(Sportsbook).filter(Sportsbook.name.ilike(f'%{sportsbook}%'))
         
         if status:
             query = query.filter(Transaction.status == status)
@@ -94,17 +146,24 @@ def create_transaction():
         tax = data.get('tax', 0.0)  # Default to 0 if not provided
         transaction_charges = data.get('transaction_charges', 0.0)  # Default to 0 if not provided
         
+        # Resolve sportsbook ID and name
+        sportsbook_id, sportsbook_name = resolve_sportsbook_id(data.get('sportsbook'))
+        
+        # Resolve account ID and identifier
+        account_id, account_identifier = resolve_account_id(data.get('account'))
+        
         # Create new transaction
         transaction = Transaction(
             transaction_type=data['transaction_type'],
-            sportsbook=data['sportsbook'],
+            sportsbook_id=sportsbook_id,
+            account_id=account_id,
             amount=amount,
             tax=tax,
             transaction_charges=transaction_charges,
             payment_method=data.get('payment_method'),
             reference_id=data.get('reference_id'),
             status=data.get('status', 'completed'),
-            date_processed=datetime.utcnow() if data.get('status', 'completed') == 'completed' else None,
+            date_processed=datetime.now() if data.get('status', 'completed') == 'completed' else None,
             notes=data.get('notes')
         )
         
@@ -131,7 +190,12 @@ def update_transaction(transaction_id):
             transaction.transaction_type = data['transaction_type']
         
         if 'sportsbook' in data:
-            transaction.sportsbook = data['sportsbook']
+            sportsbook_id, sportsbook_name = resolve_sportsbook_id(data['sportsbook'])
+            transaction.sportsbook_id = sportsbook_id
+        
+        if 'account' in data:
+            account_id, account_identifier = resolve_account_id(data['account'])
+            transaction.account_id = account_id
         
         if 'amount' in data:
             try:
@@ -163,7 +227,7 @@ def update_transaction(transaction_id):
         if 'status' in data:
             transaction.status = data['status']
             if data['status'] == 'completed' and not transaction.date_processed:
-                transaction.date_processed = datetime.utcnow()
+                transaction.date_processed = datetime.now()
         
         if 'notes' in data:
             transaction.notes = data['notes']
@@ -211,7 +275,8 @@ def get_transaction_stats():
             query = query.filter(Transaction.date_processed <= end)
         
         if sportsbook:
-            query = query.filter(Transaction.sportsbook.ilike(f'%{sportsbook}%'))
+            # Filter by sportsbook name through the relationship
+            query = query.join(Sportsbook).filter(Sportsbook.name.ilike(f'%{sportsbook}%'))
         
         transactions = query.all()
         
@@ -232,7 +297,8 @@ def get_transaction_stats():
         # Group by sportsbook
         sportsbook_stats = {}
         for transaction in transactions:
-            sb = transaction.sportsbook
+            # Get sportsbook name from relationship
+            sb = transaction.sportsbook_rel.name if transaction.sportsbook_rel else 'Unknown'
             if sb not in sportsbook_stats:
                 sportsbook_stats[sb] = {
                     'deposits': 0,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -15,11 +15,13 @@ import {
   InputAdornment,
 } from '@mui/material';
 import { transactionService } from '../services/transactionApi.js';
+import { accountService } from '../services/accountApi.js';
 
 const TransactionForm = ({ open, onClose, transaction, onSaved }) => {
   const [formData, setFormData] = useState({
     transaction_type: transaction?.transaction_type || 'deposit',
     sportsbook: transaction?.sportsbook || '',
+    account: transaction?.account || '',
     amount: transaction?.amount || '',
     tax: transaction?.tax || '',
     transaction_charges: transaction?.transaction_charges || '',
@@ -31,6 +33,32 @@ const TransactionForm = ({ open, onClose, transaction, onSaved }) => {
   
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [accounts, setAccounts] = useState([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+
+  // Fetch accounts when component mounts
+  const fetchAccounts = async () => {
+    try {
+      setLoadingAccounts(true);
+      const data = await accountService.getActiveAccounts({
+        per_page: 100, // Get plenty of accounts for dropdown
+        sort_by: 'name',
+        sort_order: 'asc'
+      });
+      setAccounts(data.accounts || []);
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+      setAccounts([]);
+    } finally {
+      setLoadingAccounts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchAccounts();
+    }
+  }, [open]);
 
   const sportsbooks = [
     'DraftKings', 'FanDuel', 'BetMGM', 'Caesars', 'PointsBet',
@@ -181,6 +209,35 @@ const TransactionForm = ({ open, onClose, transaction, onSaved }) => {
                   </MenuItem>
                 ))}
               </Select>
+            </FormControl>
+
+            <FormControl fullWidth error={!!errors.account}>
+              <InputLabel>Account</InputLabel>
+              <Select
+                value={formData.account}
+                onChange={handleInputChange('account')}
+                label="Account"
+              >
+                <MenuItem value="">
+                  <em>No Account Selected</em>
+                </MenuItem>
+                {loadingAccounts ? (
+                  <MenuItem disabled>
+                    Loading accounts...
+                  </MenuItem>
+                ) : (
+                  accounts.map((account) => (
+                    <MenuItem key={account.id} value={account.account_identifier}>
+                      {account.name}
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+              {errors.account && (
+                <Box sx={{ color: 'error.main', fontSize: '0.75rem', mt: 0.5 }}>
+                  {errors.account}
+                </Box>
+              )}
             </FormControl>
 
             <TextField

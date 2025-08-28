@@ -1,10 +1,61 @@
 from flask import Blueprint, request, jsonify
 from app import db
 from app.models.bet import Bet
+from app.models.account import Account
+from app.models.sportsbook import Sportsbook
 from datetime import datetime
+from sqlalchemy import desc, asc
 from sqlalchemy import desc, case
 
 bets_bp = Blueprint('bets', __name__)
+
+def resolve_sportsbook_id(sportsbook_input):
+    """
+    Resolve sportsbook ID from either ID or name.
+    Returns (sportsbook_id, sportsbook_name) tuple or (None, None) if not found.
+    Creates sportsbook if it doesn't exist.
+    """
+    if not sportsbook_input:
+        return None, None
+    
+    # If it's a number, treat it as ID
+    if str(sportsbook_input).isdigit():
+        sportsbook = Sportsbook.query.get(int(sportsbook_input))
+        if sportsbook:
+            return sportsbook.id, sportsbook.name
+    
+    # Otherwise, treat it as name and try to find it
+    sportsbook = Sportsbook.get_by_name(str(sportsbook_input))
+    if sportsbook:
+        return sportsbook.id, sportsbook.name
+    
+    # If not found, create new sportsbook
+    sportsbook = Sportsbook.create_if_not_exists(str(sportsbook_input))
+    db.session.add(sportsbook)
+    db.session.flush()  # Get the ID without committing
+    return sportsbook.id, sportsbook.name
+
+def resolve_account_id(account_input):
+    """
+    Resolve account ID from either ID or identifier.
+    Returns (account_id, account_identifier) tuple or (None, None) if not found.
+    """
+    if not account_input:
+        return None, None
+    
+    # If it's a number, treat it as ID
+    if str(account_input).isdigit():
+        account = Account.query.get(int(account_input))
+        if account:
+            return account.id, account.account_identifier
+    
+    # Otherwise, treat it as identifier and try to find it
+    account = Account.query.filter_by(account_identifier=str(account_input)).first()
+    if account:
+        return account.id, account.account_identifier
+    
+    # If not found, return None (don't auto-create accounts)
+    return None, None
 
 @bets_bp.route('/bets', methods=['GET'])
 def get_bets():
@@ -25,7 +76,8 @@ def get_bets():
     if sport:
         query = query.filter(Bet.sport == sport)
     if sportsbook:
-        query = query.filter(Bet.sportsbook == sportsbook)
+        # Filter by sportsbook name through the relationship
+        query = query.join(Sportsbook).filter(Sportsbook.name == sportsbook)
     
     # Order by: pending bets first (status='pending' gets priority 0, others get priority 1)
     # Then by date_placed descending (newest first)
@@ -60,11 +112,18 @@ def get_bets():
 def get_filter_options():
     """Get all available filter options (sports and sportsbooks)"""
     sports = db.session.query(Bet.sport).distinct().filter(Bet.sport.isnot(None)).all()
-    sportsbooks = db.session.query(Bet.sportsbook).distinct().filter(Bet.sportsbook.isnot(None)).all()
+    
+    # Get sportsbooks from bets that have sportsbook relationships
+    sportsbook_ids = db.session.query(Bet.sportsbook_id).distinct().filter(Bet.sportsbook_id.isnot(None)).all()
+    sportsbooks = []
+    for sportsbook_id_tuple in sportsbook_ids:
+        sportsbook = Sportsbook.query.get(sportsbook_id_tuple[0])
+        if sportsbook:
+            sportsbooks.append(sportsbook.name)
     
     return jsonify({
         'sports': [sport[0] for sport in sports if sport[0]],
-        'sportsbooks': [sportsbook[0] for sportsbook in sportsbooks if sportsbook[0]]
+        'sportsbooks': sportsbooks
     })
 
 @bets_bp.route('/bets', methods=['POST'])
@@ -84,12 +143,19 @@ def create_bet():
             except ValueError:
                 return jsonify({'error': 'Invalid kickoff datetime format'}), 400
         
+        # Resolve sportsbook ID and name
+        sportsbook_id, sportsbook_name = resolve_sportsbook_id(data.get('sportsbook'))
+        
+        # Resolve account ID and identifier
+        account_id, account_identifier = resolve_account_id(data.get('account'))
+        
         bet = Bet(
             sport=data['sport'],
             event_name=data['event_name'],
             bet_type=data['bet_type'],
             selection=data['selection'],
-            sportsbook=data['sportsbook'],
+            sportsbook_id=sportsbook_id,
+            account_id=account_id,
             odds=data['odds'],
             stake=data['stake'],
             potential_payout=potential_payout,
@@ -111,8 +177,17 @@ def update_bet(bet_id):
     data = request.get_json()
     
     try:
-        # Update fields
-        for field in ['sport', 'event_name', 'bet_type', 'selection', 'sportsbook', 'odds', 'stake', 'notes']:
+        # Handle sportsbook and account updates with ID resolution
+        if 'sportsbook' in data:
+            sportsbook_id, sportsbook_name = resolve_sportsbook_id(data['sportsbook'])
+            bet.sportsbook_id = sportsbook_id
+        
+        if 'account' in data:
+            account_id, account_identifier = resolve_account_id(data['account'])
+            bet.account_id = account_id
+        
+        # Update other fields
+        for field in ['sport', 'event_name', 'bet_type', 'selection', 'odds', 'stake', 'notes']:
             if field in data:
                 setattr(bet, field, data[field])
         
@@ -133,23 +208,23 @@ def update_bet(bet_id):
             if data['status'] == 'won':
                 bet.actual_payout = data.get('actual_payout', bet.potential_payout)
                 bet.profit_loss = bet.actual_payout - bet.stake
-                bet.date_settled = datetime.utcnow()
+                bet.date_settled = datetime.now()
             elif data['status'] == 'half_won':
                 bet.actual_payout = data.get('actual_payout', (bet.potential_payout + bet.stake) / 2)
                 bet.profit_loss = bet.actual_payout - bet.stake
-                bet.date_settled = datetime.utcnow()
+                bet.date_settled = datetime.now()
             elif data['status'] == 'lost':
                 bet.actual_payout = 0
                 bet.profit_loss = -bet.stake
-                bet.date_settled = datetime.utcnow()
+                bet.date_settled = datetime.now()
             elif data['status'] == 'half_lost':
                 bet.actual_payout = bet.stake / 2  # Get back half the stake
                 bet.profit_loss = bet.actual_payout - bet.stake  # This will be negative (loss)
-                bet.date_settled = datetime.utcnow()
+                bet.date_settled = datetime.now()
             elif data['status'] == 'void':
                 bet.actual_payout = bet.stake  # Stake returned
                 bet.profit_loss = 0
-                bet.date_settled = datetime.utcnow()
+                bet.date_settled = datetime.now()
         
         # Recalculate potential payout if odds or stake changed
         if 'odds' in data or 'stake' in data:

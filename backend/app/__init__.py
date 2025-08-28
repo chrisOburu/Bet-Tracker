@@ -21,14 +21,22 @@ def create_app():
     from app.models.bet import Bet
     from app.models.transaction import Transaction
     from app.models.arbitrage import Arbitrage
+    from app.models.account import Account
+    from app.models.sportsbook import Sportsbook
     
     # Register blueprints
     from app.routes.bets import bets_bp
     from app.routes.transactions import transactions_bp
     from app.routes.arbitrages import arbitrages_bp
+    from app.routes.accounts import accounts_bp
+    from app.routes.sportsbooks import sportsbooks_bp
+    from app.routes.admin import admin_bp
     app.register_blueprint(bets_bp, url_prefix='/api')
     app.register_blueprint(transactions_bp, url_prefix='/api')
     app.register_blueprint(arbitrages_bp, url_prefix='/api')
+    app.register_blueprint(accounts_bp, url_prefix='/api')
+    app.register_blueprint(sportsbooks_bp, url_prefix='/api')
+    app.register_blueprint(admin_bp, url_prefix='/api')
     
     # Create tables
     with app.app_context():

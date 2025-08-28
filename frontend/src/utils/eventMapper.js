@@ -92,7 +92,17 @@ export const getEventLink = (bookmaker, matchInfo, matchId = null) => {
 
 // Function to extract match ID from various sources
 export const extractMatchId = (opportunity, bookmaker) => {
-  // Try to extract match ID from different possible locations
+  // First try to get from combination_details (for arbitrage data)
+  if (opportunity.combination_details) {
+    const combinationDetail = opportunity.combination_details.find(
+      detail => detail.bookmaker === bookmaker
+    );
+    if (combinationDetail && combinationDetail.match_id) {
+      return combinationDetail.match_id;
+    }
+  }
+
+  // Try to extract match ID from match_info (for other data structures)
   const matchInfo = opportunity.match_info;
   
   if (!matchInfo) return null;
@@ -110,7 +120,25 @@ export const extractMatchId = (opportunity, bookmaker) => {
 // Main function to get event-specific link with match ID support
 export const getEventLinkWithMatchId = (opportunity, bookmaker) => {
   const matchId = extractMatchId(opportunity, bookmaker);
-  const matchInfo = opportunity.match_info?.matches_by_site?.[bookmaker]?.[0] || {};
+  
+  // Extract match info from combination_details if available (for arbitrage data)
+  let matchInfo = {};
+  if (opportunity.combination_details) {
+    const combinationDetail = opportunity.combination_details.find(
+      detail => detail.bookmaker === bookmaker
+    );
+    if (combinationDetail) {
+      matchInfo = {
+        home_team: combinationDetail.home_team,
+        away_team: combinationDetail.away_team,
+        league: combinationDetail.league,
+        country: combinationDetail.country
+      };
+    }
+  } else if (opportunity.match_info?.matches_by_site?.[bookmaker]?.[0]) {
+    // Fall back to match_info structure if available
+    matchInfo = opportunity.match_info.matches_by_site[bookmaker][0];
+  }
   
   return getEventLink(bookmaker, matchInfo, matchId);
 };

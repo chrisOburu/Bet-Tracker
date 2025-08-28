@@ -24,6 +24,7 @@ import {
   Alert,
   Pagination,
   Stack,
+  Tooltip,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -401,6 +402,7 @@ const Transactions = () => {
               <TableCell>Date</TableCell>
               <TableCell>Type</TableCell>
               <TableCell>Sportsbook</TableCell>
+              <TableCell>Account</TableCell>
               <TableCell align="right">Amount</TableCell>
               <TableCell align="right">Tax</TableCell>
               <TableCell align="right">Transaction Charges</TableCell>
@@ -413,7 +415,7 @@ const Transactions = () => {
           <TableBody>
             {transactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} align="center">
+                <TableCell colSpan={11} align="center">
                   <Typography variant="body2" color="textSecondary">
                     No transactions found
                   </Typography>
@@ -449,6 +451,13 @@ const Transactions = () => {
                         }
                       }}
                     />
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip title={transaction.account_name || 'No account specified'} arrow>
+                      <Typography variant="body2" color="textSecondary">
+                        {transaction.account_name || 'N/A'}
+                      </Typography>
+                    </Tooltip>
                   </TableCell>
                   <TableCell align="right">
                     <Typography 

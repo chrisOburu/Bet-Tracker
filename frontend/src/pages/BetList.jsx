@@ -203,6 +203,26 @@ const BetList = () => {
     return new Date(dateString).toLocaleDateString();
   };
 
+  const formatAccountDisplay = (account) => {
+    if (!account) return 'N/A';
+    
+    // Check if it's an email or phone number
+    if (account.includes('@')) {
+      // Email: show last 3 characters before @
+      const [localPart, domain] = account.split('@');
+      if (localPart.length > 3) {
+        return `...${localPart.slice(-3)}@${domain}`;
+      }
+      return account;
+    } else {
+      // Phone number: show last 3 digits
+      if (account.length > 3) {
+        return `...${account.slice(-3)}`;
+      }
+      return account;
+    }
+  };
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -309,6 +329,7 @@ const BetList = () => {
               <TableCell>Event</TableCell>
               <TableCell>Selection</TableCell>
               <TableCell>Sportsbook</TableCell>
+              <TableCell>Account</TableCell>
               <TableCell>Kickoff</TableCell>
               <TableCell align="right">Odds</TableCell>
               <TableCell align="right">Stake</TableCell>
@@ -321,13 +342,13 @@ const BetList = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={12} align="center">
+                <TableCell colSpan={13} align="center">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : bets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} align="center">
+                <TableCell colSpan={13} align="center">
                   No bets found
                 </TableCell>
               </TableRow>
@@ -380,6 +401,13 @@ const BetList = () => {
                         }
                       }}
                     />
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip title={bet.account || 'No account specified'} arrow>
+                      <Typography variant="body2" color="textSecondary">
+                        {bet.account_name || 'N/A'}
+                      </Typography>
+                    </Tooltip>
                   </TableCell>
                   <TableCell>
                     {bet.kickoff ? (

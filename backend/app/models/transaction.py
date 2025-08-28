@@ -6,7 +6,11 @@ class Transaction(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     transaction_type = db.Column(db.String(20), nullable=False)  # 'deposit' or 'withdrawal'
-    sportsbook = db.Column(db.String(100), nullable=False)
+    
+    # Foreign key references
+    sportsbook_id = db.Column(db.Integer, db.ForeignKey('sportsbook.id'), nullable=True)
+    account_id = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=True)
+    
     amount = db.Column(db.Float, nullable=False)
     tax = db.Column(db.Float, nullable=False, default=0.0)  # 5% of amount
     transaction_charges = db.Column(db.Float, nullable=False, default=0.0)  # defaults to 115
@@ -17,11 +21,31 @@ class Transaction(db.Model):
     date_processed = db.Column(db.DateTime, nullable=True)
     notes = db.Column(db.Text, nullable=True)
     
+    # Relationships
+    sportsbook_rel = db.relationship('Sportsbook', backref='transactions', lazy=True, foreign_keys=[sportsbook_id])
+    account_rel = db.relationship('Account', backref='transactions', lazy=True, foreign_keys=[account_id])
+    
     def to_dict(self):
+        # Get sportsbook name from relationship
+        sportsbook_name = None
+        if self.sportsbook_rel:
+            sportsbook_name = self.sportsbook_rel.name
+        
+        # Get account name and identifier from relationship
+        account_name = None
+        account_identifier = None
+        if self.account_rel:
+            account_name = self.account_rel.name
+            account_identifier = self.account_rel.account_identifier
+        
         return {
             'id': self.id,
             'transaction_type': self.transaction_type,
-            'sportsbook': self.sportsbook,
+            'sportsbook_id': self.sportsbook_id,
+            'sportsbook': sportsbook_name,
+            'account_id': self.account_id,
+            'account': account_identifier,
+            'account_name': account_name,
             'amount': self.amount,
             'tax': self.tax,
             'transaction_charges': self.transaction_charges,
@@ -34,4 +58,5 @@ class Transaction(db.Model):
         }
     
     def __repr__(self):
-        return f'<Transaction {self.transaction_type}: ${self.amount} - {self.sportsbook}>'
+        sportsbook_name = self.sportsbook_rel.name if self.sportsbook_rel else 'Unknown'
+        return f'<Transaction {self.transaction_type}: ${self.amount} - {sportsbook_name}>'

@@ -7,7 +7,9 @@ import {
   AccountBalance as AccountBalanceIcon,
   TrendingUp as TrendingUpIcon,
   DarkMode as DarkModeIcon,
-  LightMode as LightModeIcon
+  LightMode as LightModeIcon,
+  People as PeopleIcon,
+  SportsEsports as SportsIcon
 } from '@mui/icons-material';
 import { useTheme } from '../contexts/ThemeContext.jsx';
 
@@ -67,6 +69,32 @@ const Navigation = () => {
         }}
       >
         Transactions
+      </Button>
+      <Button
+        component={NavLink}
+        to="/accounts"
+        color="inherit"
+        startIcon={<PeopleIcon />}
+        sx={{
+          '&.active': {
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          },
+        }}
+      >
+        Accounts
+      </Button>
+      <Button
+        component={NavLink}
+        to="/sportsbooks"
+        color="inherit"
+        startIcon={<SportsIcon />}
+        sx={{
+          '&.active': {
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          },
+        }}
+      >
+        Sportsbooks
       </Button>
       <Tooltip title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
         <IconButton

@@ -22,9 +22,11 @@ import {
   FormControlLabel,
   FormControl,
   FormLabel,
+  MenuItem,
   useTheme
 } from '@mui/material';
 import { formatPercentage } from '../utils/formatters';
+import { accountService } from '../services/accountApi.js';
 
 const AddToBetsModal = ({ 
   open, 
@@ -40,6 +42,33 @@ const AddToBetsModal = ({
   const [calculatedStakes, setCalculatedStakes] = useState([]);
   const [fixedStakeMode, setFixedStakeMode] = useState('total'); // 'total' or index number
   const [individualStakes, setIndividualStakes] = useState({});
+  const [accounts, setAccounts] = useState([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [selectedAccounts, setSelectedAccounts] = useState({}); // Store account for each bet
+
+  // Fetch accounts when component mounts
+  const fetchAccounts = async () => {
+    try {
+      setLoadingAccounts(true);
+      const data = await accountService.getActiveAccounts({
+        per_page: 100, // Get plenty of accounts for dropdown
+        page: 1
+      });
+      
+      setAccounts(data.accounts || []);
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+      setAccounts([]);
+    } finally {
+      setLoadingAccounts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchAccounts();
+    }
+  }, [open]);
 
   const calculateStakes = () => {
     if (!opportunity || !opportunity.combination_details) return;
@@ -142,6 +171,13 @@ const AddToBetsModal = ({
     }
   };
 
+  const handleAccountChange = (index, accountId) => {
+    setSelectedAccounts(prev => ({
+      ...prev,
+      [index]: accountId
+    }));
+  };
+
   const handleStakeModeChange = (event) => {
     const newMode = event.target.value;
     const oldMode = fixedStakeMode;
@@ -179,6 +215,7 @@ const AddToBetsModal = ({
     setStakes({});
     setCalculatedStakes([]);
     setEstimatedReturn(0);
+    setSelectedAccounts({});
   };
 
   const handleClose = () => {
@@ -188,7 +225,14 @@ const AddToBetsModal = ({
 
   const handleConfirm = () => {
     if (onConfirm) {
-      onConfirm(stakes);
+      // Combine stakes with account selections
+      const betsData = calculatedStakes.map((stake, index) => ({
+        ...stake,
+        account: selectedAccounts[index] || '',
+        stake: stakes[index] || stake.stake
+      }));
+      
+      onConfirm(betsData);
       resetStakesState();
     }
   };
@@ -328,7 +372,7 @@ const AddToBetsModal = ({
           Individual Bets
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Stakes are automatically calculated based on your selected method above.
+          Stakes are automatically calculated based on your selected method above. You can optionally select an account for each bet.
         </Typography>
         
         <TableContainer component={Paper} sx={{ mb: 3 }}>
@@ -339,6 +383,7 @@ const AddToBetsModal = ({
                 <TableCell>Selection</TableCell>
                 <TableCell align="center">Odds</TableCell>
                 <TableCell align="center">Stake ($)</TableCell>
+                <TableCell>Account</TableCell>
                 <TableCell align="center">Potential Return ($)</TableCell>
                 <TableCell align="center">Profit ($)</TableCell>
               </TableRow>
@@ -351,6 +396,32 @@ const AddToBetsModal = ({
                   <TableCell align="center">{stakeInfo.odds.toFixed(2)}</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 'bold' }}>
                     {stakeInfo.stake.toFixed(2)}
+                  </TableCell>
+                  <TableCell>
+                    <TextField
+                      select
+                      value={selectedAccounts[index] || ''}
+                      onChange={(e) => handleAccountChange(index, e.target.value)}
+                      size="small"
+                      fullWidth
+                      variant="outlined"
+                      placeholder="Select Account"
+                    >
+                      <MenuItem value="">
+                        <em>No Account</em>
+                      </MenuItem>
+                      {loadingAccounts ? (
+                        <MenuItem disabled>
+                          Loading accounts...
+                        </MenuItem>
+                      ) : (
+                        accounts.map((account) => (
+                          <MenuItem key={account.id} value={account.account_identifier}>
+                            {account.name}
+                          </MenuItem>
+                        ))
+                      )}
+                    </TextField>
                   </TableCell>
                   <TableCell align="center">
                     {stakeInfo.potentialReturn.toFixed(2)}

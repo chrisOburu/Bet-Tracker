@@ -6,6 +6,8 @@ import Dashboard from './pages/Dashboard.jsx';
 import BetList from './pages/BetList.jsx';
 import Transactions from './pages/Transactions.jsx';
 import Arbitrages from './pages/Arbitrages.jsx';
+import AccountsPage from './pages/AccountsPage.jsx';
+import SportsbooksPage from './pages/SportsbooksPage.jsx';
 import Navigation from './components/Navigation.jsx';
 import ThemeContextProvider from './contexts/ThemeContext.jsx';
 
@@ -28,6 +30,8 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/bets" element={<BetList />} />
             <Route path="/transactions" element={<Transactions />} />
+            <Route path="/accounts" element={<AccountsPage />} />
+            <Route path="/sportsbooks" element={<SportsbooksPage />} />
           </Routes>
         </Container>
       </Router>

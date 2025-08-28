@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material';
 import { betService } from '../services/api.js';
+import { accountService } from '../services/accountApi.js';
 
 const BetForm = ({ open, onClose, onSubmit, bet = null }) => {
   const [formData, setFormData] = useState({
@@ -20,6 +21,7 @@ const BetForm = ({ open, onClose, onSubmit, bet = null }) => {
     bet_type: '',
     selection: '',
     sportsbook: '',
+    account: '',
     odds: '',
     stake: '',
     kickoff: '',
@@ -27,6 +29,32 @@ const BetForm = ({ open, onClose, onSubmit, bet = null }) => {
   });
 
   const [errors, setErrors] = useState({});
+  const [accounts, setAccounts] = useState([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+
+  // Fetch accounts when component mounts
+  const fetchAccounts = async () => {
+    try {
+      setLoadingAccounts(true);
+      const data = await accountService.getActiveAccounts({
+        per_page: 100, // Get plenty of accounts for dropdown
+        sort_by: 'name',
+        sort_order: 'asc'
+      });
+      setAccounts(data.accounts || []);
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+      setAccounts([]);
+    } finally {
+      setLoadingAccounts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchAccounts();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (bet) {
@@ -36,6 +64,7 @@ const BetForm = ({ open, onClose, onSubmit, bet = null }) => {
         bet_type: bet.bet_type || '',
         selection: bet.selection || '',
         sportsbook: bet.sportsbook || '',
+        account: bet.account || '',
         odds: bet.odds || '',
         stake: bet.stake || '',
         kickoff: bet.kickoff ? bet.kickoff.slice(0, 16) : '', // Format for datetime-local input
@@ -48,6 +77,7 @@ const BetForm = ({ open, onClose, onSubmit, bet = null }) => {
         bet_type: '',
         selection: '',
         sportsbook: '',
+        account: '',
         odds: '',
         stake: '',
         kickoff: '',
@@ -219,6 +249,33 @@ const BetForm = ({ open, onClose, onSubmit, bet = null }) => {
                     {book}
                   </MenuItem>
                 ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                select
+                name="account"
+                label="Account"
+                value={formData.account}
+                onChange={handleChange}
+                fullWidth
+                error={!!errors.account}
+                helperText={errors.account || "Select an account or leave empty"}
+              >
+                <MenuItem value="">
+                  <em>No Account Selected</em>
+                </MenuItem>
+                {loadingAccounts ? (
+                  <MenuItem disabled>
+                    Loading accounts...
+                  </MenuItem>
+                ) : (
+                  accounts.map((account) => (
+                    <MenuItem key={account.id} value={account.account_identifier}>
+                      {account.name}
+                    </MenuItem>
+                  ))
+                )}
               </TextField>
             </Grid>
             <Grid item xs={12} sm={6}>

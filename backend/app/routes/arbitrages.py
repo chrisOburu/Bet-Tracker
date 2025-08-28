@@ -2,6 +2,8 @@ from flask import Blueprint, request, jsonify
 from app import db
 from app.models.arbitrage import Arbitrage
 from app.models.bet import Bet
+from app.models.account import Account
+from app.models.sportsbook import Sportsbook
 from datetime import datetime
 from sqlalchemy import desc, asc, func
 import json
@@ -9,6 +11,55 @@ from collections import defaultdict
 import os
 
 arbitrages_bp = Blueprint('arbitrages', __name__)
+
+def resolve_sportsbook_id(sportsbook_input):
+    """
+    Resolve sportsbook ID from either ID or name.
+    Returns (sportsbook_id, sportsbook_name) tuple or (None, None) if not found.
+    Creates sportsbook if it doesn't exist.
+    """
+    if not sportsbook_input:
+        return None, None
+    
+    # If it's a number, treat it as ID
+    if str(sportsbook_input).isdigit():
+        sportsbook = Sportsbook.query.get(int(sportsbook_input))
+        if sportsbook:
+            return sportsbook.id, sportsbook.name
+    
+    # Otherwise, treat it as name and try to find it
+    sportsbook = Sportsbook.get_by_name(str(sportsbook_input))
+    if sportsbook:
+        return sportsbook.id, sportsbook.name
+    
+    # If not found, create new sportsbook
+    sportsbook = Sportsbook.create_if_not_exists(str(sportsbook_input))
+    db.session.add(sportsbook)
+    db.session.flush()  # Get the ID without committing
+    return sportsbook.id, sportsbook.name
+
+def resolve_account_id(account_input):
+    """
+    Resolve account ID from either ID or identifier.
+    Returns (account_id, account_identifier) tuple or (None, None) if not found.
+    """
+    if not account_input:
+        return None, None
+    
+    # If it's a number, treat it as ID
+    if str(account_input).isdigit():
+        account = Account.query.get(int(account_input))
+        if account:
+            return account.id, account.account_identifier
+    
+    # Otherwise, treat it as identifier and try to find it
+    account = Account.query.filter_by(account_identifier=str(account_input)).first()
+    if account:
+        return account.id, account.account_identifier
+    
+    # If not found, return None (don't auto-create accounts)
+    return None, None
+    return None
 
 @arbitrages_bp.route('/arbitrages/grouped', methods=['GET'])
 def get_grouped_arbitrages():
@@ -383,6 +434,9 @@ def add_arbitrage_to_bets(arbitrage_id):
         # Get default stake from request or use default
         default_stake = data.get('stake', 100.0)  # Default $100 per bet
         
+        # Get account from request data (optional)
+        account = data.get('account')
+        
         created_bets = []
         
         # Create a bet for each combination in the arbitrage
@@ -394,13 +448,20 @@ def add_arbitrage_to_bets(arbitrage_id):
             # Calculate potential payout
             potential_payout = default_stake * odds
             
+            # Resolve sportsbook ID and name
+            sportsbook_id, sportsbook_name = resolve_sportsbook_id(bookmaker)
+            
+            # Resolve account ID and identifier
+            account_id, account_identifier = resolve_account_id(account)
+            
             # Create the bet
             bet = Bet(
                 sport='Football',  # Assuming football for now
                 event_name=event_name,
                 bet_type=market,
                 selection=selection,
-                sportsbook=bookmaker,
+                sportsbook_id=sportsbook_id,
+                account_id=account_id,
                 odds=odds,
                 stake=default_stake,
                 status='pending',
@@ -432,7 +493,7 @@ def add_arbitrage_to_bets(arbitrage_id):
 
 @arbitrages_bp.route('/arbitrages/add-to-bets', methods=['POST'])
 def add_arbitrage_to_bets_by_data():
-    """Convert arbitrage opportunity data into individual bets with custom stakes"""
+    """Convert arbitrage opportunity data into individual bets with custom stakes and accounts"""
     try:
         data = request.get_json()
         
@@ -444,7 +505,9 @@ def add_arbitrage_to_bets_by_data():
         match_signature = data.get('match_signature', '')
         profit = data.get('profit', 0)
         kickoff_datetime = data.get('kickoff_datetime')
-        custom_stakes = data.get('stakes', {})  # Custom stakes from modal
+        
+        # Handle both old stakes format (dict) and new format (list of bet objects)
+        stakes_data = data.get('stakes', {})
         
         if not combination_details:
             return jsonify({'error': 'No betting combinations found'}), 400
@@ -477,7 +540,11 @@ def add_arbitrage_to_bets_by_data():
         # Get default stake from request or use default
         default_stake = data.get('stake', 100.0)  # Default $100 per bet
         
+        # Get default account from request data (optional)
+        default_account = data.get('account')
+        
         created_bets = []
+        total_stake = 0
         
         # Create a bet for each combination in the arbitrage
         for i, combo in enumerate(combination_details):
@@ -485,12 +552,31 @@ def add_arbitrage_to_bets_by_data():
             odds = float(combo.get('odds', 1.0))
             selection = combo.get('name', 'Unknown Selection')
             
-            # Use custom stake if provided, otherwise use default stake
-            stake = custom_stakes.get(str(i), default_stake)  # Key format from modal is string index
-            stake = float(stake)
+            # Handle stakes data - check if it's the new format (list) or old format (dict)
+            if isinstance(stakes_data, list) and i < len(stakes_data):
+                # New format: stakes_data is a list of bet objects with stake and account
+                bet_data = stakes_data[i]
+                stake = float(bet_data.get('stake', default_stake))
+                account = bet_data.get('account', default_account)
+            elif isinstance(stakes_data, dict):
+                # Old format: stakes_data is a dictionary with index as key
+                stake = float(stakes_data.get(str(i), default_stake))
+                account = default_account
+            else:
+                # Fallback to defaults
+                stake = default_stake
+                account = default_account
+            
+            total_stake += stake
             
             # Calculate potential payout
             potential_payout = stake * odds
+            
+            # Resolve sportsbook ID and name
+            sportsbook_id, sportsbook_name = resolve_sportsbook_id(bookmaker)
+            
+            # Resolve account ID and identifier
+            account_id, account_identifier = resolve_account_id(account)
             
             # Create the bet
             bet = Bet(
@@ -498,7 +584,8 @@ def add_arbitrage_to_bets_by_data():
                 event_name=event_name,
                 bet_type=market,
                 selection=selection,
-                sportsbook=bookmaker,
+                sportsbook_id=sportsbook_id,
+                account_id=account_id,
                 odds=odds,
                 stake=stake,
                 status='pending',
@@ -515,9 +602,6 @@ def add_arbitrage_to_bets_by_data():
             created_bets.append(bet)
         
         db.session.commit()
-        
-        # Calculate total stake for response
-        total_stake = sum(float(custom_stakes.get(str(i), default_stake)) for i in range(len(combination_details)))
         
         return jsonify({
             'message': f'Successfully created {len(created_bets)} bets from arbitrage opportunity',

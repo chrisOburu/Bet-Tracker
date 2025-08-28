@@ -10,15 +10,10 @@ from app import create_app, db
 from app.models.bet import Bet
 from app.models.transaction import Transaction
 from app.models.arbitrage import Arbitrage
+from app.models.account import Account
 
 def create_dummy_bets():
-    """Create dummy betting records for testing and demons        # Create dummy data
-        create_dummy_bets()
-        create_dummy_transactions()
-        create_dummy_arbitrages()
-        
-        print("
-All dummy data created successfully!")ration"""
+    """Create dummy betting records for testing and demonstration"""
     
     app = create_app()
     
@@ -30,6 +25,25 @@ All dummy data created successfully!")ration"""
         
         # Sample data
         sports = ['Football', 'Basketball', 'Baseball', 'Hockey', 'Soccer', 'Tennis', 'Golf', 'Boxing', 'MMA']
+        
+        # Sample account data (emails and phone numbers)
+        accounts = [
+            'john.doe@email.com',
+            'sarah.smith@gmail.com',
+            'mike.johnson@yahoo.com',
+            'lisa.brown@hotmail.com',
+            'david.wilson@outlook.com',
+            '+1234567890',
+            '+9876543210',
+            '+5551234567',
+            '+4447891234',
+            '+3216549870',
+            'betting.pro@icloud.com',
+            'lucky.player@proton.me',
+            '+1555999888',
+            'sports.fan@email.co',
+            '+447123456789'
+        ]
         
         bet_types = ['Moneyline', 'Point Spread', 'Over/Under', 'Prop Bet', 'Parlay', 'Future']
         
@@ -129,7 +143,7 @@ All dummy data created successfully!")ration"""
             hours = random.randint(0, 23)
             minutes = random.randint(0, 59)
             seconds = random.randint(0, 59)
-            date_placed = datetime.utcnow() - timedelta(days=days_ago, hours=hours, minutes=minutes, seconds=seconds)
+            date_placed = datetime.now() - timedelta(days=days_ago, hours=hours, minutes=minutes, seconds=seconds)
             
             # Determine status (70% settled, 30% pending)
             if random.random() < 0.7:  # 70% chance of being settled
@@ -180,6 +194,9 @@ All dummy data created successfully!")ration"""
             kickoff_minutes = random.choice([0, 15, 30, 45])  # Common kickoff times
             kickoff = date_placed + timedelta(days=kickoff_days_ahead, hours=kickoff_hours, minutes=kickoff_minutes)
             
+            # Select account (80% chance of having an account)
+            account = random.choice(accounts) if random.random() < 0.8 else None
+            
             bet = Bet(
                 sport=sport,
                 event_name=event_name,
@@ -195,7 +212,8 @@ All dummy data created successfully!")ration"""
                 date_placed=date_placed,
                 date_settled=date_settled,
                 kickoff=kickoff,
-                notes=notes
+                notes=notes,
+                account=account
             )
             
             bets_to_create.append(bet)
@@ -244,6 +262,25 @@ def create_dummy_transactions():
         'Hard Rock Bet', 'ESPN BET', 'bet365', 'Other'
     ]
     
+    # Sample account data (emails and phone numbers)
+    accounts = [
+        'john.doe@email.com',
+        'sarah.smith@gmail.com',
+        'mike.johnson@yahoo.com',
+        'lisa.brown@hotmail.com',
+        'david.wilson@outlook.com',
+        '+1234567890',
+        '+9876543210',
+        '+5551234567',
+        '+4447891234',
+        '+3216549870',
+        'betting.pro@icloud.com',
+        'lucky.player@proton.me',
+        '+1555999888',
+        'sports.fan@email.co',
+        '+447123456789'
+    ]
+    
     payment_methods = [
         'Bank Transfer', 'Credit Card', 'Debit Card', 'PayPal',
         'Crypto', 'Check', 'Cash App', 'Venmo', 'Skrill'
@@ -265,7 +302,7 @@ def create_dummy_transactions():
         minutes = random.randint(0, 59)
         seconds = random.randint(0, 59)
         
-        date_created = datetime.utcnow() - timedelta(days=days_ago, hours=hours, minutes=minutes, seconds=seconds)
+        date_created = datetime.now() - timedelta(days=days_ago, hours=hours, minutes=minutes, seconds=seconds)
         
         transaction_type = random.choice(transaction_types)
         sportsbook = random.choice(sportsbooks)
@@ -323,6 +360,9 @@ def create_dummy_transactions():
             ]
             notes = random.choice(note_options)
         
+        # Select account (85% chance of having an account)
+        account = random.choice(accounts) if random.random() < 0.85 else None
+        
         transaction = Transaction(
             transaction_type=transaction_type,
             sportsbook=sportsbook,
@@ -334,7 +374,8 @@ def create_dummy_transactions():
             status=status,
             date_created=date_created,
             date_processed=date_processed,
-            notes=notes
+            notes=notes,
+            account=account
         )
         
         transactions.append(transaction)
@@ -488,6 +529,158 @@ Maximum Profit: {max_profit:.2f}%
 """)
 
 
+def create_dummy_accounts():
+    """Create dummy account data"""
+    print("Creating account records...")
+    
+    app = create_app()
+    
+    with app.app_context():
+        # Clear existing accounts
+        print("Clearing existing accounts...")
+        Account.query.delete()
+        db.session.commit()
+        
+        # Sample account data
+        account_data = [
+            {
+                'account_identifier': 'john.doe@email.com',
+                'account_type': 'email',
+                'name': 'John Doe',
+                'is_active': True,
+                'notes': 'Primary betting account'
+            },
+            {
+                'account_identifier': 'sarah.smith@gmail.com',
+                'account_type': 'email',
+                'name': 'Sarah Smith',
+                'is_active': True,
+                'notes': None
+            },
+            {
+                'account_identifier': 'mike.johnson@yahoo.com',
+                'account_type': 'email',
+                'name': 'Mike Johnson',
+                'is_active': False,
+                'notes': 'Closed account'
+            },
+            {
+                'account_identifier': 'lisa.brown@hotmail.com',
+                'account_type': 'email',
+                'name': 'Lisa Brown',
+                'is_active': True,
+                'notes': 'VIP account'
+            },
+            {
+                'account_identifier': 'david.wilson@outlook.com',
+                'account_type': 'email',
+                'name': 'David Wilson',
+                'is_active': True,
+                'notes': None
+            },
+            {
+                'account_identifier': '+1234567890',
+                'account_type': 'phone',
+                'name': 'Phone User 1',
+                'is_active': True,
+                'notes': 'Mobile betting account'
+            },
+            {
+                'account_identifier': '+9876543210',
+                'account_type': 'phone',
+                'name': 'Phone User 2',
+                'is_active': True,
+                'notes': None
+            },
+            {
+                'account_identifier': '+5551234567',
+                'account_type': 'phone',
+                'name': 'Mobile Bettor',
+                'is_active': False,
+                'notes': 'Suspended account'
+            },
+            {
+                'account_identifier': '+4447891234',
+                'account_type': 'phone',
+                'name': 'Premium User',
+                'is_active': True,
+                'notes': 'High volume trader'
+            },
+            {
+                'account_identifier': '+3216549870',
+                'account_type': 'phone',
+                'name': 'Anonymous User',
+                'is_active': True,
+                'notes': None
+            },
+            {
+                'account_identifier': 'betting.pro@icloud.com',
+                'account_type': 'email',
+                'name': 'Pro Bettor',
+                'is_active': True,
+                'notes': 'Professional betting account'
+            },
+            {
+                'account_identifier': 'lucky.player@proton.me',
+                'account_type': 'email',
+                'name': 'Lucky Player',
+                'is_active': True,
+                'notes': 'Recreational player'
+            },
+            {
+                'account_identifier': '+1555999888',
+                'account_type': 'phone',
+                'name': 'Quick Bettor',
+                'is_active': True,
+                'notes': 'Fast paced betting'
+            },
+            {
+                'account_identifier': 'sports.fan@email.co',
+                'account_type': 'email',
+                'name': 'Sports Fan',
+                'is_active': True,
+                'notes': 'Loves all sports'
+            },
+            {
+                'account_identifier': '+447123456789',
+                'account_type': 'phone',
+                'name': 'International User',
+                'is_active': True,
+                'notes': 'UK based account'
+            }
+        ]
+        
+        accounts_to_create = []
+        
+        for data in account_data:
+            account = Account(
+                account_identifier=data['account_identifier'],
+                account_type=data['account_type'],
+                name=data['name'],
+                is_active=data['is_active'],
+                notes=data['notes']
+            )
+            accounts_to_create.append(account)
+        
+        # Add all accounts to the database
+        print(f"Creating {len(accounts_to_create)} dummy accounts...")
+        db.session.add_all(accounts_to_create)
+        db.session.commit()
+        
+        # Print summary statistics
+        total_accounts = len(accounts_to_create)
+        active_accounts = len([acc for acc in accounts_to_create if acc.is_active])
+        email_accounts = len([acc for acc in accounts_to_create if acc.account_type == 'email'])
+        phone_accounts = len([acc for acc in accounts_to_create if acc.account_type == 'phone'])
+        
+        print(f"\nAccount Summary:")
+        print(f"Total Accounts: {total_accounts}")
+        print(f"Active Accounts: {active_accounts}")
+        print(f"Inactive Accounts: {total_accounts - active_accounts}")
+        print(f"Email Accounts: {email_accounts}")
+        print(f"Phone Accounts: {phone_accounts}")
+
+
 if __name__ == '__main__':
     app = create_app()
     
@@ -496,6 +689,7 @@ if __name__ == '__main__':
         db.create_all()
         
         # Create dummy data
+        create_dummy_accounts()
         create_dummy_bets()
         create_dummy_transactions()
         #create_dummy_arbitrages()
